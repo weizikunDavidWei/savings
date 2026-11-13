@@ -57,7 +57,8 @@
 
 1. 在 [Supabase 控制台](https://supabase.com/dashboard) 创建项目，等待准备完成。
 2. 点击应用中的「复制初始化代码」。回到项目左侧 **SQL Editor → New query**，粘贴并点 **Run**。看到 **Success** 即可。代码与附带的 `supabase-setup.sql` 一致，可重复运行。
-3. 打开 **Authentication → Email → Templates → Magic Link**（部分界面称 **Email Templates**），将正文替换为应用里「复制验证码邮件模板」提供的内容并保存。模板会显示 `{{ .Token }}` 数字验证码。
+3. 打开 **Authentication → URL Configuration**，将 **Site URL** 与 **Redirect URLs** 都设置为 `https://weizikundavidwei.github.io/savings/`。
+4. **Magic Link 邮件保持 Supabase 默认模板即可**，其中的 `{{ .ConfirmationURL }}` 会生成完整登录链接。如果之前改成了纯数字验证码模板，请恢复默认模板，或使用应用提供的可选兼容模板（同时提供链接与数字验证码）。
 
 **02 · 粘贴连接信息**
 
@@ -65,25 +66,31 @@
 
 **03 · 用邮箱连接**
 
-输入邮箱，发送验证码，再输入最新邮件中的数字。验证成功后自动同步；「上次成功同步」有真实时间才表示同步完成。
+输入邮箱，点击「发送登录链接」，然后在**发起登录的同一浏览器和设备**打开最新邮件中的链接。返回网站后会自动恢复账户并触发既有同步；「上次成功同步」有真实时间才表示数据同步完成。
+
+该流程使用官方 `supabase.auth.signInWithOtp()`，固定 `emailRedirectTo` 为 `https://weizikundavidwei.github.io/savings/`。应用使用 PKCE：发送时由 SDK 保存 verifier，返回后通过 `exchangeCodeForSession()` 换取会话；兼容旧版 implicit token 回调。地址中的认证参数会立即清除，会话通过官方 SDK 持久化与自动刷新；旧版本保存的登录也会迁移。退出仅清除此浏览器的认证缓存，保留储蓄账本。
+
+数字 OTP 仍在「使用数字验证码（可选）」中。若邮件模板也包含 `{{ .Token }}`，可用 `verifyOtp()` 手动登录；默认模板只有链接时，直接点击链接即可，无需修改模板或配置 SMTP。
 
 个人使用时，先用**创建 Supabase 项目的邮箱**。默认邮件服务只发送给项目团队成员邮箱，且发送次数有限；其他邮箱需配置自有 SMTP。[默认邮件服务说明](https://supabase.com/docs/guides/auth/auth-smtp)
 
 ### 第二台设备
 
-在 Mac / iPhone 打开同一个网站，填入**相同项目地址与公开密钥**，用**同一邮箱**登录。第 01 步只做一次，第二台只需第 02、03 步。本机已有记录会与此账户合并。应用每分钟及重新联网、回到页面时检查同步。
+在 Mac / iPhone 打开同一个网站，填入**相同项目地址与公开密钥**，用**同一邮箱**发送链接登录。每台设备都应自行发起登录，并在同一浏览器打开该设备收到的最新链接。第 01 步只做一次，第二台只需第 02、03 步。本机已有记录会与此账户合并。应用每分钟及重新联网、回到页面时检查同步。
 
 ### 常见问题
 
 | 情况 | 怎么做 |
 |---|---|
-| 没有收到验证码 | 查看垃圾邮件；确认邮箱是项目团队邮箱；默认邮件服务限额较低，避免连续重发。其他邮箱需要自有 SMTP。 |
-| 邮件只有一个登录链接 | 用应用提供的验证码模板替换 Magic Link 邮件正文，保存后重新发送。 |
+| 没有收到登录邮件 | 查看垃圾邮件；确认邮箱是项目团队邮箱；默认邮件服务限额较低，避免连续重发。其他邮箱需要自有 SMTP。 |
+| 邮件只有一个登录链接 | 这是默认 Magic Link 邮件，直接点击即可，不必输入验证码。 |
 | 提示找不到表或函数 | 确认在同一个 Supabase 项目运行了完整初始化代码，再尝试同步。 |
-| 验证码无效或过期 | 使用最新邮件中的验证码，或等候后重新发送。 |
+| 链接或验证码无效、过期 | 使用最新邮件；Magic Link 必须在发起登录的同一浏览器和设备打开。重新发送会更新本地 PKCE verifier。 |
+| 点击邮件返回 localhost 或其他地址 | 在 Supabase 的 URL Configuration 中将 Site URL 与 Redirect URLs 配置为上面的完整 GitHub Pages 地址。 |
+| 返回后提示缺少 verifier | 用发起登录的同一浏览器打开最新邮件链接，避免在内置邮件浏览器、其他浏览器或不同设备打开。 |
 | 暂时离线 | 照常记账，联网后自动重试，本机数据保留。 |
 
-邮箱验证码配置参考 [Supabase 官方指南](https://supabase.com/docs/guides/auth/auth-email-passwordless)。应用提供复制失败时的手动选择和 SQL 下载；来回切换页面复制连接信息时，未提交的输入会暂存在当前页面中。
+邮箱链接与验证码配置参考 [Supabase 官方指南](https://supabase.com/docs/guides/auth/auth-email-passwordless)。Magic Link 不需要自定义 SMTP，但 Supabase 默认邮件服务仅向项目团队邮箱发送邮件，这项限制不会因切换认证方式而消失。应用提供复制失败时的手动选择和 SQL 下载；来回切换页面复制连接信息时，未提交的输入会暂存在当前页面中。
 
 ### 合并规则
 
@@ -109,4 +116,12 @@
 
 ## 当前验证范围
 
-已完成脚本语法和 47 项逻辑检查，覆盖真实零状态、连续点击、整数金额、撤销、购买扣款、备份去重与校验、持久化重载、存储异常、删除标记传播、多设备合并、断网恢复、主题切换不改变账本、单色图表、完整 SQL 复制、配置草稿保留、验证码发送流程、拨轮精度、触屏拖动、键盘调节、最近金额去重与一键重复储蓄。存储和云端使用受控模拟环境验证；尚未连接实际 Supabase 项目。当前工具限制了本地文件的浏览器预览，Safari 实机外观、触控及实际下载与文件选择行为仍需在本机验收。
+已完成脚本语法和 63 项逻辑检查，覆盖真实零状态、连续点击、整数金额、撤销、购买扣款、备份去重与校验、持久化重载、存储异常、删除标记传播、多设备合并、断网恢复、主题切换不改变账本、单色图表、完整 SQL 复制、配置草稿保留、验证码发送流程、拨轮精度、触屏拖动、键盘调节、最近金额去重与一键重复储蓄。存储和云端使用受控模拟环境验证；尚未连接实际 Supabase 项目。已另外使用内置的官方 SDK 核对真实请求构造、SHA-256 PKCE challenge、code/verifier 交换、会话恢复与退出行为，网络使用受控响应。尚未向实际 Supabase 项目发送登录邮件；实际邮件投递与返回地址配置需在你的项目中验收。
+
+### 内置认证组件
+
+`index.html` 内置官方 `@supabase/supabase-js` **2.119.0** 浏览器发行版，保留 MIT 许可证。没有外部 CDN 脚本请求，也不需要安装 npm 或运行构建工具。数据库 SQL、已有流水和视觉 CSS 保持不变。认证缓存独立于储蓄数据，不进入 JSON 备份。
+
+Magic Link 请在 GitHub Pages 地址中发起；从 `file://` 打开的本地 HTML 与 HTTPS 网站不共享 PKCE verifier。离线本地记账始终可用。
+
+参考：[PKCE 流程](https://supabase.com/docs/guides/auth/sessions/pkce-flow)、[返回地址配置](https://supabase.com/docs/guides/auth/redirect-urls)、[默认邮件服务限制](https://supabase.com/docs/guides/auth/auth-smtp)。
