@@ -318,7 +318,13 @@
 [data-theme=dark] .glyph-choice:not([aria-pressed=true]) > .icon { color: #d4d4d4; }
 [data-theme=dark] .glyph-choice:hover:not([aria-pressed=true]) > .icon { color: var(--ink); }
 [data-theme=dark] .quick-card:is([data-action=quick-save],[data-action=edit-quick]) .quick-top > .icon { color: #dedede; }
-[data-theme=dark] :is(.quick-grid > .quick-card:first-child,.quick-manage-card:first-child .quick-card) .quick-top > .icon { color: #303030; }
+[data-theme=dark] :is(.quick-grid > .quick-card:first-child:not(.custom-amount-card),.quick-manage-card:first-child .quick-card) .quick-top > .icon { color: #303030; }
+[data-theme=dark] .quick-grid > .custom-amount-card:first-child {
+  background: var(--white);
+  color: var(--ink);
+  border-color: #484848;
+}
+[data-theme=dark] .quick-grid > .custom-amount-card:first-child:hover { background: var(--white); border-color: #a6a6a6; }
 [data-theme=dark] .quick-grid > .custom-amount-card:first-child .quick-top > .icon { color: #dedede; }
 
 </style>
