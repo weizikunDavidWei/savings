@@ -231,6 +231,96 @@
 :root[data-theme=dark][data-pure-black=true] .goal-blank:after{background:#000000}
 :root[data-theme=dark][data-pure-black=true] .activity-symbol{background:#000000!important}
 
+/* 15 — Shortcut icon picker. Surfaces and emphasis follow the current theme. */
+.glyph-picker {
+  --glyph-surface: var(--white);
+  --glyph-secondary: var(--muted);
+  --glyph-hover: var(--paper);
+  --glyph-border: var(--line);
+  border: 1px solid var(--glyph-border);
+  background: var(--glyph-surface);
+}
+.glyph-picker > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  min-height: 56px;
+  list-style: none;
+  cursor: pointer;
+}
+.glyph-picker > summary::-webkit-details-marker { display: none; }
+.glyph-picker > summary:hover { background: var(--glyph-hover); }
+.glyph-picker > summary > .icon { color: var(--glyph-secondary); width: 16px; height: 16px; }
+.glyph-picker[open] > summary > .icon { transform: rotate(180deg); }
+.glyph-current {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid transparent;
+  background: var(--glyph-bg);
+  color: var(--glyph-ink);
+}
+.glyph-summary { display: grid; gap: 3px; flex: 1; min-width: 0; }
+.glyph-summary > span { font-size: 10px; color: var(--glyph-secondary); }
+.glyph-summary strong { font-size: 12px; font-weight: 550; }
+.glyph-picker-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(94px, 28%);
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--glyph-border);
+}
+.glyph-picker-tools :is(input, select) {
+  min-width: 0;
+  min-height: 44px;
+  padding: 7px 9px;
+  font-size: 12px;
+}
+.glyph-results { max-height: min(245px, 35dvh); overflow: auto; padding: 0 12px 8px; }
+.glyph-results:empty { display: none; }
+.glyph-group + .glyph-group { margin-top: 12px; }
+.glyph-group h4 { margin: 8px 0; font-size: 11px; font-weight: 550; color: var(--glyph-secondary); }
+.glyph-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+  gap: 5px;
+}
+.glyph-choice {
+  min-height: 62px;
+  padding: 6px 3px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--ink);
+  border: 1px solid var(--glyph-border);
+}
+.glyph-choice > .icon { width: 22px; height: 22px; }
+.glyph-choice:hover { background: var(--glyph-hover); border-color: var(--glyph-secondary); }
+.glyph-choice:focus-visible { outline-offset: -3px; }
+.glyph-choice[aria-pressed=true] { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.glyph-choice:active { box-shadow: inset 0 0 0 1px currentColor; }
+.glyph-choice:disabled { cursor: default; opacity: .45; }
+.glyph-empty { padding: 12px; }
+.glyph-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+[data-theme=dark] .glyph-picker {
+  --glyph-hover: #222;
+  --glyph-secondary: #b5b5b5;
+  --glyph-border: #555;
+}
+[data-theme=dark] .glyph-current { background: var(--paper); color: #dedede; border-color: var(--glyph-border); }
+[data-theme=dark] .glyph-choice:not([aria-pressed=true]) > .icon { color: #d4d4d4; }
+[data-theme=dark] .glyph-choice:hover:not([aria-pressed=true]) > .icon { color: var(--ink); }
+[data-theme=dark] .quick-card:is([data-action=quick-save],[data-action=edit-quick]) .quick-top > .icon { color: #dedede; }
+[data-theme=dark] :is(.quick-grid > .quick-card:first-child,.quick-manage-card:first-child .quick-card) .quick-top > .icon { color: #303030; }
+[data-theme=dark] .quick-grid > .custom-amount-card:first-child .quick-top > .icon { color: #dedede; }
+
 </style>
 </head>
 <body>
@@ -312,10 +402,210 @@ const dateTime=d=>new Date(d).toLocaleString('zh-CN',{year:'numeric',month:'shor
 function cents(v,allowNegative=false){const s=String(v).trim();if(!(allowNegative?/^-?\d+(\.\d{1,2})?$/:/^\d+(\.\d{1,2})?$/).test(s))throw Error('请输入最多两位小数的有效金额。');const negative=s.startsWith('-'),[a,b='']=s.replace('-','').split('.');const n=Number(a)*100+Number(b.padEnd(2,'0'));if(!Number.isSafeInteger(n)||n>MAX_CENTS)throw Error('金额超出支持范围。');return negative?-n:n}
 function basis(v){const n=cents(v);if(n>10000)throw Error('税率应在 0%–100% 之间。');return n}
 const taxed=(base,tax)=>base+Math.round(base*tax/10000);
-const contrast=hex=>{const rgb=hex.slice(1).match(/.{2}/g)?.map(v=>parseInt(v,16))||[255,255,255];return (.299*rgb[0]+.587*rgb[1]+.114*rgb[2])>155?'#242622':'#fffef9'};
+function luminance(hex) {
+  const rgb = hex.slice(1).match(/.{2}/g).map(value => {
+    const channel = parseInt(value, 16) / 255;
+    return channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4;
+  });
+  return .2126 * rgb[0] + .7152 * rgb[1] + .0722 * rgb[2];
+}
+const CARD_DARK = luminance('#242622'), CARD_LIGHT = luminance('#fffef9');
+function contrast(hex) {
+  const base = luminance(hex) + .05;
+  if (base / (CARD_DARK + .05) >= 4.5) return '#242622';
+  if ((CARD_LIGHT + .05) / base >= 4.5) return '#fffef9';
+  return base * base >= .0525 ? '#000000' : '#ffffff';
+}
 const svg=(body,cls='icon')=>`<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${body}</svg>`;
 const ICONS={grid:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>',heart:'<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/>',chart:'<path d="M4 20V12m8 8V4m8 16V8"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',settings:'<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3" fill="var(--paper)"/><circle cx="16" cy="17" r="3" fill="var(--paper)"/>',coffee:'<path d="M4 8h12v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3Zm12 1h2a3 3 0 0 1 0 6h-2M7 3v2m4-2v2M2 23h18"/>',food:'<path d="m5 4 2 9m5-9 1 9M3 13h18l-3 8H6ZM9 3v9m9-8-1 9"/>',burger:'<path d="M3 10a9 7 0 0 1 18 0ZM3 14h18M4 18h16l-2 3H6ZM8 6h.01M12 5h.01M16 6h.01"/>',meal:'<path d="M3 11h11M4 15h9l-2 6H6ZM3 8a5 4 0 0 1 10 0M17 8h5l-1 13h-4ZM19 8l1-6"/>',plus:'<path d="M12 5v14M5 12h14"/>',arrow:'<path d="M5 12h14m-5-5 5 5-5 5"/>',arrowup:'<path d="M7 17 17 7M7 7h10v10"/>',down:'<path d="m6 9 6 6 6-6"/>',up:'<path d="m6 15 6-6 6 6"/>',edit:'<path d="m15 4 5 5M3 21l5-1L21 7a2.1 2.1 0 0 0-4-4L4 16Z"/>',trash:'<path d="M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>',close:'<path d="m6 6 12 12M6 18 18 6"/>',check:'<path d="m5 12 4 4L19 6"/>',download:'<path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/>',upload:'<path d="M12 16V4m-4 4 4-4 4 4M4 16v5h16v-5"/>',cloud:'<path d="M6 18a4.5 4.5 0 0 1-1-9 7 7 0 0 1 13-1 5 5 0 0 1 0 10ZM9 13l3-3 3 3m-3-3v8"/>',spark:'<path d="m12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z"/>',note:'<path d="M7 3h10l4 4v14H3V3ZM7 11h10M7 15h7"/>',wallet:'<rect x="3" y="5" width="18" height="15" rx="1"/><path d="M3 5V3h14v2m4 5h-6v5h6m-3-2.5h.01"/>'};
-const icon=n=>svg(ICONS[n]||ICONS.spark);
+/* Tabler Icons v3.52.0 — official outline SVG shapes used in the shortcut picker.
+   https://github.com/tabler/tabler-icons/tree/v3.52.0
+   The original shortcut glyphs remain available for saved records.
+
+MIT License
+
+Copyright (c) 2020-2026 Paweł Kuna
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
+const TABLER_GROUPS = {
+  "餐饮饮品": [
+    ["burger","汉堡","快餐","<path d=\"M4 15h16a4 4 0 0 1 -4 4h-8a4 4 0 0 1 -4 -4\" /><path d=\"M12 4c3.783 0 6.953 2.133 7.786 5h-15.572c.833 -2.867 4.003 -5 7.786 -5\" /><path d=\"M5 12h14\" />"],
+    ["pizza","披萨","","<path d=\"M12 21.5c-3.04 0 -5.952 -.714 -8.5 -1.983l8.5 -16.517l8.5 16.517a19.09 19.09 0 0 1 -8.5 1.983\" /><path d=\"M5.38 15.866a14.94 14.94 0 0 0 6.815 1.634a14.944 14.944 0 0 0 6.502 -1.479\" /><path d=\"M13 11.01v-.01\" /><path d=\"M11 14v-.01\" />"],
+    ["salad","沙拉","轻食 蔬菜","<path d=\"M4 11h16a1 1 0 0 1 1 1v.5c0 1.5 -2.517 5.573 -4 6.5v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1c-1.687 -1.054 -4 -5 -4 -6.5v-.5a1 1 0 0 1 1 -1\" /><path d=\"M18.5 11c.351 -1.017 .426 -2.236 .5 -3.714v-1.286h-2.256c-2.83 0 -4.616 .804 -5.64 2.076\" /><path d=\"M5.255 11.008a12.204 12.204 0 0 1 -.255 -2.008v-1h1.755c.98 0 1.801 .124 2.479 .35\" /><path d=\"M8 8l1 -4l4 2.5\" /><path d=\"M13 11v-.5a2.5 2.5 0 1 0 -5 0v.5\" />"],
+    ["bowl-spoon","餐碗","面条 米饭 外卖","<path d=\"M4 11h16a1 1 0 0 1 1 1v.5c0 1.5 -2.517 5.573 -4 6.5v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1c-1.687 -1.054 -4 -5 -4 -6.5v-.5a1 1 0 0 1 1 -1\" /><path d=\"M8 7c1.657 0 3 -.895 3 -2s-1.343 -2 -3 -2s-3 .895 -3 2s1.343 2 3 2\" /><path d=\"M11 5h9\" />"],
+    ["tools-kitchen-2","餐具","套餐 正餐","<path d=\"M19 3v12h-5c-.023 -3.681 .184 -7.406 5 -12m0 12v6h-1v-3m-10 -14v17m-3 -17v3a3 3 0 1 0 6 0v-3\" />"],
+    ["baguette","法棍","面包 三明治","<path d=\"M5.628 11.283l5.644 -5.637c2.665 -2.663 5.924 -3.747 8.663 -1.205l.188 .181a2.987 2.987 0 0 1 0 4.228l-11.287 11.274a3 3 0 0 1 -4.089 .135l-.143 -.135c-2.728 -2.724 -1.704 -6.117 1.024 -8.841\" /><path d=\"M9.5 7.5l1.5 3.5\" /><path d=\"M6.5 10.5l1.5 3.5\" /><path d=\"M12.5 4.5l1.5 3.5\" />"],
+    ["soup","汤品","面汤","<path d=\"M4 11h16a1 1 0 0 1 1 1v.5c0 1.5 -2.517 5.573 -4 6.5v1a1 1 0 0 1 -1 1h-8a1 1 0 0 1 -1 -1v-1c-1.687 -1.054 -4 -5 -4 -6.5v-.5a1 1 0 0 1 1 -1\" /><path d=\"M12 4a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2\" /><path d=\"M16 4a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2\" /><path d=\"M8 4a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2\" />"],
+    ["egg","鸡蛋","早餐","<path d=\"M19 14.083c0 4.154 -2.966 6.74 -7 6.917c-4.2 0 -7 -2.763 -7 -6.917c0 -5.538 3.5 -11.09 7 -11.083c3.5 .007 7 5.545 7 11.083\" />"],
+    ["fish","鱼","海鲜","<path d=\"M16.69 7.44a6.973 6.973 0 0 0 -1.69 4.56c0 1.747 .64 3.345 1.699 4.571\" /><path d=\"M2 9.504c7.715 8.647 14.75 10.265 20 2.498c-5.25 -7.761 -12.285 -6.142 -20 2.504\" /><path d=\"M18 11v.01\" /><path d=\"M11.5 10.5c-.667 1 -.667 2 0 3\" />"],
+    ["coffee","咖啡","拿铁 杯子","<path d=\"M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1\" /><path d=\"M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2\" /><path d=\"M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2\" /><path d=\"M3 10h14v5a6 6 0 0 1 -6 6h-2a6 6 0 0 1 -6 -6v-5\" /><path d=\"M16.746 16.726a3 3 0 1 0 .252 -5.555\" />"],
+    ["cup","马克杯","茶杯 热饮","<path d=\"M5 11h14v-3h-14l0 3\" /><path d=\"M17.5 11l-1.5 10h-8l-1.5 -10\" /><path d=\"M6 8v-1a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v1\" /><path d=\"M15 5v-2\" />"],
+    ["bubble-tea","奶茶","珍珠 饮料","<path d=\"M17.95 9l-1.478 8.69c-.25 1.463 -.374 2.195 -.936 2.631c-1.2 .931 -6.039 .88 -7.172 0c-.562 -.436 -.687 -1.168 -.936 -2.632l-1.478 -8.689\" /><path d=\"M6 9l.514 -1.286a5.908 5.908 0 0 1 10.972 0l.514 1.286\" /><path d=\"M5 9h14\" /><path d=\"M12 9l4 -7\" /><path d=\"M10.01 14h.01\" /><path d=\"M11.02 18h.01\" /><path d=\"M13.02 16h.01\" />"],
+    ["glass","饮料","水杯","<path d=\"M8 21h8\" /><path d=\"M12 16v5\" /><path d=\"M17 5l1 6c0 3.012 -2.686 5 -6 5s-6 -1.988 -6 -5l1 -6\" /><path d=\"M7 5a5 2 0 1 0 10 0a5 2 0 1 0 -10 0\" />"],
+    ["milk","牛奶","","<path d=\"M8 6h8v-2a1 1 0 0 0 -1 -1h-6a1 1 0 0 0 -1 1v2\" /><path d=\"M16 6l1.094 1.759a6 6 0 0 1 .906 3.17v8.071a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8.071a6 6 0 0 1 .906 -3.17l1.094 -1.759\" /><path d=\"M10 16a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M10 10h4\" />"],
+    ["bottle","瓶装饮料","水壶","<path d=\"M10 5h4v-2a1 1 0 0 0 -1 -1h-2a1 1 0 0 0 -1 1v2\" /><path d=\"M14 3.5c0 1.626 .507 3.212 1.45 4.537l.05 .07a8.093 8.093 0 0 1 1.5 4.694v6.199a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2v-6.2c0 -1.682 .524 -3.322 1.5 -4.693l.05 -.07a7.823 7.823 0 0 0 1.45 -4.537\" /><path d=\"M7 14.803a2.4 2.4 0 0 0 1 -.803a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 1 -.805\" />"],
+    ["ice-cream","冰淇淋","雪糕","<path d=\"M12 21.5v-4.5\" /><path d=\"M8 17h8v-10a4 4 0 1 0 -8 0v10\" /><path d=\"M8 10.5l8 -3.5\" /><path d=\"M8 14.5l8 -3.5\" />"],
+    ["cake","蛋糕","甜品","<path d=\"M3 20h18v-8a3 3 0 0 0 -3 -3h-12a3 3 0 0 0 -3 3v8\" /><path d=\"M3 14.803c.312 .135 .654 .204 1 .197a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1c.35 .007 .692 -.062 1 -.197\" /><path d=\"M12 4l1.465 1.638a2 2 0 1 1 -3.015 .099l1.55 -1.737\" />"],
+    ["cookie","饼干","零食 曲奇","<path d=\"M8 13v.01\" /><path d=\"M12 17v.01\" /><path d=\"M12 12v.01\" /><path d=\"M16 14v.01\" /><path d=\"M11 8v.01\" /><path d=\"M13.148 3.476l2.667 1.104a4 4 0 0 0 4.656 6.14l.053 .132a3 3 0 0 1 0 2.296q -.745 1.18 -1.024 1.852q -.283 .684 -.66 2.216a3 3 0 0 1 -1.624 1.623q -1.572 .394 -2.216 .661q -.712 .295 -1.852 1.024a3 3 0 0 1 -2.296 0q -1.203 -.754 -1.852 -1.024q -.707 -.292 -2.216 -.66a3 3 0 0 1 -1.623 -1.624q -.397 -1.577 -.661 -2.216q -.298 -.718 -1.024 -1.852a3 3 0 0 1 0 -2.296q .719 -1.116 1.024 -1.852q .257 -.62 .66 -2.216a3 3 0 0 1 1.624 -1.623q 1.547 -.384 2.216 -.661q .687 -.285 1.852 -1.024a3 3 0 0 1 2.296 0\" />"],
+    ["candy","糖果","甜食","<path d=\"M7.05 11.293l4.243 -4.243a2 2 0 0 1 2.828 0l2.829 2.83a2 2 0 0 1 0 2.828l-4.243 4.243a2 2 0 0 1 -2.828 0l-2.829 -2.831a2 2 0 0 1 0 -2.828\" /><path d=\"M16.243 9.172l3.086 -.772a1.5 1.5 0 0 0 .697 -2.516l-2.216 -2.217a1.5 1.5 0 0 0 -2.44 .47l-1.248 2.913\" /><path d=\"M9.172 16.243l-.772 3.086a1.5 1.5 0 0 1 -2.516 .697l-2.217 -2.216a1.5 1.5 0 0 1 .47 -2.44l2.913 -1.248\" />"],
+    ["apple","水果","苹果","<path d=\"M4 11.319c0 3.102 .444 5.319 2.222 7.978c1.351 1.797 3.156 2.247 5.08 .988c.426 -.268 .97 -.268 1.397 0c1.923 1.26 3.728 .809 5.079 -.988c1.778 -2.66 2.222 -4.876 2.222 -7.977c0 -2.661 -1.99 -5.32 -4.444 -5.32c-1.267 0 -2.41 .693 -3.22 1.44a.5 .5 0 0 1 -.672 0c-.809 -.746 -1.953 -1.44 -3.22 -1.44c-2.454 0 -4.444 2.66 -4.444 5.319\" /><path d=\"M7 12c0 -1.47 .454 -2.34 1.5 -3\" /><path d=\"M12 7c0 -1.2 .867 -4 3 -4\" />"]
+  ],
+  "数码外设": [
+    ["device-laptop","笔记本电脑","手提电脑","<path d=\"M3 19l18 0\" /><path d=\"M5 7a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v8a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -8\" />"],
+    ["device-mobile","手机","智能手机","<path d=\"M6 5a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-14\" /><path d=\"M11 4h2\" /><path d=\"M12 17v.01\" />"],
+    ["device-tablet","平板","iPad","<path d=\"M5 4a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v16a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1v-16\" /><path d=\"M11 17a1 1 0 1 0 2 0a1 1 0 0 0 -2 0\" />"],
+    ["device-desktop","台式机","显示器 屏幕","<path d=\"M3 5a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10\" /><path d=\"M7 20h10\" /><path d=\"M9 16v4\" /><path d=\"M15 16v4\" />"],
+    ["device-tv","电视","","<path d=\"M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9\" /><path d=\"M16 3l-4 4l-4 -4\" />"],
+    ["cpu","处理器","芯片","<path d=\"M5 6a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1l0 -12\" /><path d=\"M9 9h6v6h-6l0 -6\" /><path d=\"M3 10h2\" /><path d=\"M3 14h2\" /><path d=\"M10 3v2\" /><path d=\"M14 3v2\" /><path d=\"M21 10h-2\" /><path d=\"M21 14h-2\" /><path d=\"M14 21v-2\" /><path d=\"M10 21v-2\" />"],
+    ["device-floppy","存储设备","硬盘 SSD 磁盘","<path d=\"M6 4h10l4 4v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2\" /><path d=\"M10 14a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M14 4l0 4l-6 0l0 -4\" />"],
+    ["device-usb","U 盘","存储","<path d=\"M7 8h10v8a5 5 0 0 1 -10 0l0 -8\" /><path d=\"M9 8v-5h6v5\" />"],
+    ["keyboard","键盘","打字 机械键盘","<path d=\"M2 8a2 2 0 0 1 2 -2h16a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-16a2 2 0 0 1 -2 -2l0 -8\" /><path d=\"M6 10l0 .01\" /><path d=\"M10 10l0 .01\" /><path d=\"M14 10l0 .01\" /><path d=\"M18 10l0 .01\" /><path d=\"M6 14l0 .01\" /><path d=\"M18 14l0 .01\" /><path d=\"M10 14l4 .01\" />"],
+    ["mouse","鼠标","桌面外设","<path d=\"M6 7a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v10a4 4 0 0 1 -4 4h-4a4 4 0 0 1 -4 -4l0 -10\" /><path d=\"M12 7l0 4\" />"],
+    ["device-watch","智能手表","穿戴设备","<path d=\"M6 9a3 3 0 0 1 3 -3h6a3 3 0 0 1 3 3v6a3 3 0 0 1 -3 3h-6a3 3 0 0 1 -3 -3v-6\" /><path d=\"M9 18v3h6v-3\" /><path d=\"M9 6v-3h6v3\" />"],
+    ["router","路由器","网络 Wi-Fi","<path d=\"M3 15a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -4\" /><path d=\"M17 17l0 .01\" /><path d=\"M13 17l0 .01\" /><path d=\"M15 13l0 -2\" /><path d=\"M11.75 8.75a4 4 0 0 1 6.5 0\" /><path d=\"M8.5 6.5a8 8 0 0 1 13 0\" />"],
+    ["battery-charging","电池充电","充电宝","<path d=\"M16 7h1a2 2 0 0 1 2 2v.5a.5 .5 0 0 0 .5 .5a.5 .5 0 0 1 .5 .5v3a.5 .5 0 0 1 -.5 .5a.5 .5 0 0 0 -.5 .5v.5a2 2 0 0 1 -2 2h-2\" /><path d=\"M8 7h-2a2 2 0 0 0 -2 2v6a2 2 0 0 0 2 2h1\" /><path d=\"M12 8l-2 4h3l-2 4\" />"],
+    ["plug","电源插头","充电器","<path d=\"M9.785 6l8.215 8.215l-2.054 2.054a5.81 5.81 0 1 1 -8.215 -8.215l2.054 -2.054\" /><path d=\"M4 20l3.5 -3.5\" /><path d=\"M15 4l-3.5 3.5\" /><path d=\"M20 9l-3.5 3.5\" />"],
+    ["printer","打印机","","<path d=\"M17 17h2a2 2 0 0 0 2 -2v-4a2 2 0 0 0 -2 -2h-14a2 2 0 0 0 -2 2v4a2 2 0 0 0 2 2h2\" /><path d=\"M17 9v-4a2 2 0 0 0 -2 -2h-6a2 2 0 0 0 -2 2v4\" /><path d=\"M7 15a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2l0 -4\" />"]
+  ],
+  "音频摄影": [
+    ["headphones","耳机","头戴式","<path d=\"M4 15a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2l0 -3\" /><path d=\"M15 15a2 2 0 0 1 2 -2h1a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-1a2 2 0 0 1 -2 -2l0 -3\" /><path d=\"M4 15v-3a8 8 0 0 1 16 0v3\" />"],
+    ["device-airpods","无线耳机","入耳式","<path d=\"M6 4a4 4 0 0 1 4 3.8l0 .2v10.5a1.5 1.5 0 0 1 -3 0v-6.5h-1a4 4 0 0 1 -4 -3.8l0 -.2a4 4 0 0 1 4 -4\" /><path d=\"M18 4a4 4 0 0 0 -4 3.8l0 .2v10.5a1.5 1.5 0 0 0 3 0v-6.5h1a4 4 0 0 0 4 -3.8l0 -.2a4 4 0 0 0 -4 -4\" />"],
+    ["device-speaker","音箱","扬声器 音响","<path d=\"M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -14\" /><path d=\"M9 14a3 3 0 1 0 6 0a3 3 0 1 0 -6 0\" /><path d=\"M12 7l0 .01\" />"],
+    ["microphone","麦克风","话筒","<path d=\"M9 5a3 3 0 0 1 3 -3a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3a3 3 0 0 1 -3 -3l0 -5\" /><path d=\"M5 10a7 7 0 0 0 14 0\" /><path d=\"M8 21l8 0\" /><path d=\"M12 17l0 4\" />"],
+    ["vinyl","黑胶唱片","","<path d=\"M16 3.937a9 9 0 1 0 5 8.063\" /><path d=\"M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M19 4a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M20 4l-3.5 10l-2.5 2\" />"],
+    ["music","音乐","音符","<path d=\"M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" /><path d=\"M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" /><path d=\"M9 17v-13h10v13\" /><path d=\"M9 8h10\" />"],
+    ["camera","相机","拍照 摄影","<path d=\"M5 7h1a2 2 0 0 0 2 -2a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1a2 2 0 0 0 2 2h1a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-9a2 2 0 0 1 2 -2\" /><path d=\"M9 13a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" />"],
+    ["aperture","镜头","光圈 摄影","<path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0\" /><path d=\"M3.6 15h10.55\" /><path d=\"M6.551 4.938l3.26 10.034\" /><path d=\"M17.032 4.636l-8.535 6.201\" /><path d=\"M20.559 14.51l-8.535 -6.201\" /><path d=\"M12.257 20.916l3.261 -10.034\" />"],
+    ["video","摄像机","录像 视频","<path d=\"M15 10l4.553 -2.276a1 1 0 0 1 1.447 .894v6.764a1 1 0 0 1 -1.447 .894l-4.553 -2.276v-4\" /><path d=\"M3 8a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -8\" />"],
+    ["photo","照片","图片","<path d=\"M15 8h.01\" /><path d=\"M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12\" /><path d=\"M3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5\" /><path d=\"M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3\" />"]
+  ],
+  "游戏娱乐": [
+    ["device-gamepad-2","游戏手柄","游戏机 主机","<path d=\"M12 5h3.5a5 5 0 0 1 0 10h-5.5l-4.015 4.227a2.3 2.3 0 0 1 -3.923 -2.035l1.634 -8.173a5 5 0 0 1 4.904 -4.019h3.4\" /><path d=\"M14 15l4.07 4.284a2.3 2.3 0 0 0 3.925 -2.023l-1.6 -8.232\" /><path d=\"M8 9v2\" /><path d=\"M7 10h2\" /><path d=\"M14 10h2\" />"],
+    ["device-nintendo","掌机","Switch","<path d=\"M10 20v-16h-3a4 4 0 0 0 -4 4v8a4 4 0 0 0 4 4h3\" /><path d=\"M14 20v-16h3a4 4 0 0 1 4 4v8a4 4 0 0 1 -4 4h-3\" /><path d=\"M16.5 15.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" fill=\"currentColor\" /><path d=\"M5.5 8.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" fill=\"currentColor\" />"],
+    ["dice-5","骰子","桌游","<path d=\"M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14\" /><path d=\"M8 8.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0\" fill=\"currentColor\" /><path d=\"M15 8.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0\" fill=\"currentColor\" /><path d=\"M15 15.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0\" fill=\"currentColor\" /><path d=\"M8 15.5a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0\" fill=\"currentColor\" /><path d=\"M11.5 12a.5 .5 0 1 0 1 0a.5 .5 0 1 0 -1 0\" fill=\"currentColor\" />"],
+    ["chess-knight","国际象棋","棋类","<path d=\"M8 16l-1.447 .724a1 1 0 0 0 -.553 .894v2.382h12v-2.382a1 1 0 0 0 -.553 -.894l-1.447 -.724h-8\" /><path d=\"M9 3l1 3l-3.491 2.148a1 1 0 0 0 .524 1.852h2.967l-2.073 6h7.961l.112 -5c0 -3 -1.09 -5.983 -4 -7c-1.94 -.678 -2.94 -1.011 -3 -1\" />"],
+    ["puzzle","拼图","益智 玩具","<path d=\"M4 7h3a1 1 0 0 0 1 -1v-1a2 2 0 0 1 4 0v1a1 1 0 0 0 1 1h3a1 1 0 0 1 1 1v3a1 1 0 0 0 1 1h1a2 2 0 0 1 0 4h-1a1 1 0 0 0 -1 1v3a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-1a2 2 0 0 0 -4 0v1a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1h1a2 2 0 0 0 0 -4h-1a1 1 0 0 1 -1 -1v-3a1 1 0 0 1 1 -1\" />"],
+    ["movie","电影","影视","<path d=\"M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -12\" /><path d=\"M8 4l0 16\" /><path d=\"M16 4l0 16\" /><path d=\"M4 8l4 0\" /><path d=\"M4 16l4 0\" /><path d=\"M4 12l16 0\" /><path d=\"M16 8l4 0\" /><path d=\"M16 16l4 0\" />"],
+    ["ticket","门票","演出 会员","<path d=\"M15 5l0 2\" /><path d=\"M15 11l0 2\" /><path d=\"M15 17l0 2\" /><path d=\"M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-3a2 2 0 0 0 0 -4v-3a2 2 0 0 1 2 -2\" />"],
+    ["device-projector","投影仪","电影","<path d=\"M8 9a5 5 0 1 0 10 0a5 5 0 0 0 -10 0\" /><path d=\"M9 6h-4a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-8a2 2 0 0 0 -2 -2h-2\" /><path d=\"M6 15h1\" /><path d=\"M7 18l-1 2\" /><path d=\"M18 18l1 2\" />"],
+    ["guitar-pick","吉他拨片","音乐 乐器","<path d=\"M16 18.5c2 -2.5 4 -6.5 4 -10.5c0 -2.946 -2.084 -4.157 -4.204 -4.654c-.864 -.23 -2.13 -.346 -3.796 -.346c-1.667 0 -2.932 .115 -3.796 .346c-2.12 .497 -4.204 1.708 -4.204 4.654c0 3.312 2 8 4 10.5c.297 .37 .618 .731 .963 1.081l.354 .347a3.9 3.9 0 0 0 5.364 0a14.05 14.05 0 0 0 1.319 -1.428\" />"],
+    ["calendar-repeat","订阅","会员","<path d=\"M12.5 21h-6.5a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v3\" /><path d=\"M16 3v4\" /><path d=\"M8 3v4\" /><path d=\"M4 11h12\" /><path d=\"M20 14l2 2h-3\" /><path d=\"M20 18l2 -2\" /><path d=\"M19 16a3 3 0 1 0 2 5.236\" />"]
+  ],
+  "家居生活": [
+    ["armchair","扶手椅","家具","<path d=\"M5 11a2 2 0 0 1 2 2v2h10v-2a2 2 0 1 1 4 0v4a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-4a2 2 0 0 1 2 -2\" /><path d=\"M5 11v-5a3 3 0 0 1 3 -3h8a3 3 0 0 1 3 3v5\" /><path d=\"M6 19v2\" /><path d=\"M18 19v2\" />"],
+    ["sofa","沙发","家具 客厅","<path d=\"M4 11a2 2 0 0 1 2 2v1h12v-1a2 2 0 1 1 4 0v5a1 1 0 0 1 -1 1h-18a1 1 0 0 1 -1 -1v-5a2 2 0 0 1 2 -2\" /><path d=\"M4 11v-3a3 3 0 0 1 3 -3h10a3 3 0 0 1 3 3v3\" /><path d=\"M12 5v9\" />"],
+    ["bed","床","卧室","<path d=\"M5 9a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M22 17v-3h-20\" /><path d=\"M2 8v9\" /><path d=\"M12 14h10v-2a3 3 0 0 0 -3 -3h-7v5\" />"],
+    ["table","桌子","书桌 餐桌","<path d=\"M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14\" /><path d=\"M3 10h18\" /><path d=\"M10 3v18\" />"],
+    ["lamp","台灯","照明 灯具","<path d=\"M9 20h6\" /><path d=\"M12 20v-8\" /><path d=\"M5 12h14l-4 -8h-6l-4 8\" />"],
+    ["bulb","灯泡","照明","<path d=\"M3 12h1m8 -9v1m8 8h1m-15.4 -6.4l.7 .7m12.1 -.7l-.7 .7\" /><path d=\"M9 16a5 5 0 1 1 6 0a3.5 3.5 0 0 0 -1 3a2 2 0 0 1 -4 0a3.5 3.5 0 0 0 -1 -3\" /><path d=\"M9.7 17l4.6 0\" />"],
+    ["plant","植物","花盆 绿植","<path d=\"M7 15h10v4a2 2 0 0 1 -2 2h-6a2 2 0 0 1 -2 -2v-4\" /><path d=\"M12 9a6 6 0 0 0 -6 -6h-3v2a6 6 0 0 0 6 6h3\" /><path d=\"M12 11a6 6 0 0 1 6 -6h3v1a6 6 0 0 1 -6 6h-3\" /><path d=\"M12 15l0 -6\" />"],
+    ["box","收纳盒","整理","<path d=\"M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5\" /><path d=\"M12 12l8 -4.5\" /><path d=\"M12 12l0 9\" /><path d=\"M12 12l-8 -4.5\" />"],
+    ["wash-machine","洗衣机","家电","<path d=\"M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -14\" /><path d=\"M8 14a4 4 0 1 0 8 0a4 4 0 1 0 -8 0\" /><path d=\"M8 6h.01\" /><path d=\"M11 6h.01\" /><path d=\"M14 6h2\" /><path d=\"M8 14c1.333 -.667 2.667 -.667 4 0c1.333 .667 2.667 .667 4 0\" />"],
+    ["fridge","冰箱","家电","<path d=\"M5 5a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -14\" /><path d=\"M5 10h14\" /><path d=\"M9 13v3\" /><path d=\"M9 6v1\" />"],
+    ["candle","蜡烛","香薰","<path d=\"M9 21h6v-10a1 1 0 0 0 -1 -1h-4a1 1 0 0 0 -1 1l0 10\" /><path d=\"M12 2l1.465 1.638a2 2 0 1 1 -3.015 .099l1.55 -1.737\" />"]
+  ],
+  "服饰护理": [
+    ["shirt","上衣","衣服 T 恤","<path d=\"M15 4l6 2v5h-3v8a1 1 0 0 1 -1 1h-10a1 1 0 0 1 -1 -1v-8h-3v-5l6 -2a3 3 0 0 0 6 0\" />"],
+    ["jacket","外套","夹克","<path d=\"M16 3l-4 5l-4 -5\" /><path d=\"M12 19a2 2 0 0 1 -2 2h-4a2 2 0 0 1 -2 -2v-8.172a2 2 0 0 1 .586 -1.414l.828 -.828a2 2 0 0 0 .586 -1.414v-2.172a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v2.172a2 2 0 0 0 .586 1.414l.828 .828a2 2 0 0 1 .586 1.414v8.172a2 2 0 0 1 -2 2h-4a2 2 0 0 1 -2 -2\" /><path d=\"M20 13h-3a1 1 0 0 0 -1 1v2a1 1 0 0 0 1 1h3\" /><path d=\"M4 17h3a1 1 0 0 0 1 -1v-2a1 1 0 0 0 -1 -1h-3\" /><path d=\"M12 19v-11\" />"],
+    ["shoe","鞋履","运动鞋","<path d=\"M4 6h5.426a1 1 0 0 1 .863 .496l1.064 1.823a3 3 0 0 0 1.896 1.407l4.677 1.114a4 4 0 0 1 3.074 3.89v2.27a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1v-10a1 1 0 0 1 1 -1\" /><path d=\"M14 13l1 -2\" /><path d=\"M8 18v-1a4 4 0 0 0 -4 -4h-1\" /><path d=\"M10 12l1.5 -3\" />"],
+    ["hanger","衣架","服装","<path d=\"M14 6a2 2 0 1 0 -4 0c0 1.667 .67 3 2 4h-.008l7.971 4.428a2 2 0 0 1 1.029 1.749v.823a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-.823a2 2 0 0 1 1.029 -1.749l7.971 -4.428\" />"],
+    ["paper-bag","购物袋","购物","<path d=\"M8 3h8a2 2 0 0 1 2 2v1.82a5 5 0 0 0 .528 2.236l.944 1.888a5 5 0 0 1 .528 2.236v5.82a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-5.82a5 5 0 0 1 .528 -2.236l1.472 -2.944v-3a2 2 0 0 1 2 -2\" /><path d=\"M12 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M6 21a2 2 0 0 0 2 -2v-5.82a5 5 0 0 0 -.528 -2.236l-1.472 -2.944\" /><path d=\"M11 7h2\" />"],
+    ["backpack","背包","书包","<path d=\"M5 18v-6a6 6 0 0 1 6 -6h2a6 6 0 0 1 6 6v6a3 3 0 0 1 -3 3h-8a3 3 0 0 1 -3 -3\" /><path d=\"M10 6v-1a2 2 0 1 1 4 0v1\" /><path d=\"M9 21v-4a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v4\" /><path d=\"M11 10h2\" />"],
+    ["eyeglass","眼镜","配饰","<path d=\"M8 4h-2l-3 10\" /><path d=\"M16 4h2l3 10\" /><path d=\"M10 16l4 0\" /><path d=\"M21 16.5a3.5 3.5 0 0 1 -7 0v-2.5h7v2.5\" /><path d=\"M10 16.5a3.5 3.5 0 0 1 -7 0v-2.5h7v2.5\" />"],
+    ["diamond","珠宝","首饰","<path d=\"M6 5h12l3 5l-8.5 9.5a.7 .7 0 0 1 -1 0l-8.5 -9.5l3 -5\" /><path d=\"M10 12l-2 -2.2l.6 -1\" />"],
+    ["scissors","剪刀","理发","<path d=\"M3 7a3 3 0 1 0 6 0a3 3 0 1 0 -6 0\" /><path d=\"M3 17a3 3 0 1 0 6 0a3 3 0 1 0 -6 0\" /><path d=\"M8.6 8.6l10.4 10.4\" /><path d=\"M8.6 15.4l10.4 -10.4\" />"],
+    ["razor","剃须刀","护理","<path d=\"M7 3h10v4h-10l0 -4\" /><path d=\"M12 7v4\" /><path d=\"M12 11a2 2 0 0 1 2 2v6a2 2 0 1 1 -4 0v-6a2 2 0 0 1 2 -2\" />"],
+    ["hand-sanitizer","洗护用品","清洁 洗手液 肥皂","<path d=\"M7 21h10v-10a3 3 0 0 0 -3 -3h-4a3 3 0 0 0 -3 3v10\" /><path d=\"M15 3h-6a2 2 0 0 0 -2 2\" /><path d=\"M12 3v5\" /><path d=\"M12 11v4\" /><path d=\"M10 13h4\" />"],
+    ["perfume","香水","美妆","<path d=\"M10 6v3\" /><path d=\"M14 6v3\" /><path d=\"M5 11a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -8\" /><path d=\"M10 15a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M9 3h6v3h-6l0 -3\" />"]
+  ],
+  "出行旅行": [
+    ["car","汽车","开车 打车","<path d=\"M5 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M15 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5\" />"],
+    ["bike","自行车","骑行","<path d=\"M2 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" /><path d=\"M16 18a3 3 0 1 0 6 0a3 3 0 0 0 -6 0\" /><path d=\"M12 19v-4l-3 -3l5 -4l2 3h3\" /><path d=\"M13.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" />"],
+    ["bus","公交","巴士 公共交通","<path d=\"M4 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M16 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M4 17h-2v-11a1 1 0 0 1 1 -1h14a5 7 0 0 1 5 7v5h-2m-4 0h-8\" /><path d=\"M16 5l1.5 7l4.5 0\" /><path d=\"M2 10l15 0\" /><path d=\"M7 5l0 5\" /><path d=\"M12 5l0 5\" />"],
+    ["train","火车","铁路 地铁","<path d=\"M21 13c0 -3.87 -3.37 -7 -10 -7h-8\" /><path d=\"M3 15h16a2 2 0 0 0 2 -2\" /><path d=\"M3 6v5h17.5\" /><path d=\"M3 11v4\" /><path d=\"M8 11v-5\" /><path d=\"M13 11v-4.5\" /><path d=\"M3 19h18\" />"],
+    ["plane","飞机","机票 航班","<path d=\"M16 10h4a2 2 0 0 1 0 4h-4l-4 7h-3l2 -7h-4l-2 2h-3l2 -4l-2 -4h3l2 2h4l-2 -7h3l4 7\" />"],
+    ["parking","停车","停车位","<path d=\"M3 5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-14\" /><path d=\"M10 16v-8h2.667c.736 0 1.333 .895 1.333 2s-.597 2 -1.333 2h-2.667\" />"],
+    ["gas-station","加油站","汽油","<path d=\"M14 11h1a2 2 0 0 1 2 2v3a1.5 1.5 0 0 0 3 0v-7l-3 -3\" /><path d=\"M4 20v-14a2 2 0 0 1 2 -2h6a2 2 0 0 1 2 2v14\" /><path d=\"M3 20l12 0\" /><path d=\"M18 7v1a1 1 0 0 0 1 1h1\" /><path d=\"M4 11l10 0\" />"],
+    ["luggage","行李箱","旅行","<path d=\"M6 8a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2l0 -10\" /><path d=\"M9 6v-1a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v1\" /><path d=\"M6 10h12\" /><path d=\"M6 16h12\" /><path d=\"M9 20v1\" /><path d=\"M15 20v1\" />"],
+    ["building-skyscraper","酒店","住宿","<path d=\"M3 21l18 0\" /><path d=\"M5 21v-14l8 -4v18\" /><path d=\"M19 21v-10l-6 -4\" /><path d=\"M9 9l0 .01\" /><path d=\"M9 12l0 .01\" /><path d=\"M9 15l0 .01\" /><path d=\"M9 18l0 .01\" />"],
+    ["map","地图","景点","<path d=\"M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13\" /><path d=\"M9 4v13\" /><path d=\"M15 7v13\" />"],
+    ["compass","指南针","导航 探索","<path d=\"M8 16l2 -6l6 -2l-2 6l-6 2\" /><path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0\" /><path d=\"M12 3l0 2\" /><path d=\"M12 19l0 2\" /><path d=\"M3 12l2 0\" /><path d=\"M19 12l2 0\" />"]
+  ],
+  "学业办公": [
+    ["book","书本","阅读 教材","<path d=\"M3 19a9 9 0 0 1 9 0a9 9 0 0 1 9 0\" /><path d=\"M3 6a9 9 0 0 1 9 0a9 9 0 0 1 9 0\" /><path d=\"M3 6l0 13\" /><path d=\"M12 6l0 13\" /><path d=\"M21 6l0 13\" />"],
+    ["notebook","笔记本","记事本 手帐","<path d=\"M6 4h11a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-11a1 1 0 0 1 -1 -1v-14a1 1 0 0 1 1 -1m3 0v18\" /><path d=\"M13 8l2 0\" /><path d=\"M13 12l2 0\" />"],
+    ["ballpen","签字笔","钢笔 圆珠笔 文具","<path d=\"M14 6l7 7l-4 4\" /><path d=\"M5.828 18.172a2.828 2.828 0 0 0 4 0l10.586 -10.586a2 2 0 0 0 0 -2.829l-1.171 -1.171a2 2 0 0 0 -2.829 0l-10.586 10.586a2.828 2.828 0 0 0 0 4\" /><path d=\"M4 20l1.768 -1.768\" />"],
+    ["pencil","铅笔","文具","<path d=\"M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4\" /><path d=\"M13.5 6.5l4 4\" />"],
+    ["calculator","计算器","","<path d=\"M4 5a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2l0 -14\" /><path d=\"M8 8a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1h-6a1 1 0 0 1 -1 -1l0 -1\" /><path d=\"M8 14l0 .01\" /><path d=\"M12 14l0 .01\" /><path d=\"M16 14l0 .01\" /><path d=\"M8 17l0 .01\" /><path d=\"M12 17l0 .01\" /><path d=\"M16 17l0 .01\" />"],
+    ["school","毕业帽","课程 学校","<path d=\"M22 9l-10 -4l-10 4l10 4l10 -4v6\" /><path d=\"M6 10.6v5.4a6 3 0 0 0 12 0v-5.4\" />"],
+    ["briefcase","公文包","办公 工作","<path d=\"M3 9a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v9a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2l0 -9\" /><path d=\"M8 7v-2a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v2\" /><path d=\"M12 12l0 .01\" /><path d=\"M3 13a20 20 0 0 0 18 0\" />"],
+    ["paperclip","回形针","文具","<path d=\"M15 7l-6.5 6.5a1.5 1.5 0 0 0 3 3l6.5 -6.5a3 3 0 0 0 -6 -6l-6.5 6.5a4.5 4.5 0 0 0 9 9l6.5 -6.5\" />"],
+    ["folder","文件夹","办公","<path d=\"M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2\" />"]
+  ],
+  "运动健康": [
+    ["barbell","杠铃","健身 力量","<path d=\"M2 12h1\" /><path d=\"M6 8h-2a1 1 0 0 0 -1 1v6a1 1 0 0 0 1 1h2\" /><path d=\"M6 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1\" /><path d=\"M9 12h6\" /><path d=\"M15 7v10a1 1 0 0 0 1 1h1a1 1 0 0 0 1 -1v-10a1 1 0 0 0 -1 -1h-1a1 1 0 0 0 -1 1\" /><path d=\"M18 8h2a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-2\" /><path d=\"M22 12h-1\" />"],
+    ["ball-basketball","篮球","球类","<path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0\" /><path d=\"M5.65 5.65l12.7 12.7\" /><path d=\"M5.65 18.35l12.7 -12.7\" /><path d=\"M12 3a9 9 0 0 0 9 9\" /><path d=\"M3 12a9 9 0 0 1 9 9\" />"],
+    ["ball-football","足球","球类","<path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0\" /><path d=\"M12 7l4.76 3.45l-1.76 5.55h-6l-1.76 -5.55l4.76 -3.45\" /><path d=\"M12 7v-4m3 13l2.5 3m-.74 -8.55l3.74 -1.45m-11.44 7.05l-2.56 2.95m.74 -8.55l-3.74 -1.45\" />"],
+    ["ball-tennis","网球","球类","<path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0\" /><path d=\"M6 5.3a9 9 0 0 1 0 13.4\" /><path d=\"M18 5.3a9 9 0 0 0 0 13.4\" />"],
+    ["run","跑步","田径","<path d=\"M11.007 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M4 17l5 1l.75 -1.5\" /><path d=\"M15 21v-4l-4 -3l1 -6\" /><path d=\"M7 12v-3l5 -1l3 3l3 1\" />"],
+    ["swimming","游泳","水上运动","<path d=\"M15 9a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M6 11l4 -2l3.5 3l-1.5 2\" /><path d=\"M3 16.75a2.4 2.4 0 0 0 1 .25a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 1 -.25\" />"],
+    ["tent","帐篷","露营 户外","<path d=\"M11 14l4 6h6l-9 -16l-9 16h6l4 -6\" />"],
+    ["mountain","登山","徒步 户外","<path d=\"M3 20h18l-6.921 -14.612a2.3 2.3 0 0 0 -4.158 0l-6.921 14.612\" /><path d=\"M7.5 11l2 2.5l2.5 -2.5l2 3l2.5 -2\" />"],
+    ["heartbeat","心率","健康","<path d=\"M19.5 13.572l-7.5 7.428l-2.896 -2.868m-6.117 -8.104a5 5 0 0 1 9.013 -3.022a5 5 0 1 1 7.5 6.572\" /><path d=\"M3 13h2l2 3l2 -6l1 3h3\" />"]
+  ],
+  "社交通用": [
+    ["gift","礼物","生日 送礼","<path d=\"M3 9a1 1 0 0 1 1 -1h16a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-16a1 1 0 0 1 -1 -1l0 -2\" /><path d=\"M12 8l0 13\" /><path d=\"M19 12v7a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-7\" /><path d=\"M7.5 8a2.5 2.5 0 0 1 0 -5a4.8 8 0 0 1 4.5 5a4.8 8 0 0 1 4.5 -5a2.5 2.5 0 0 1 0 5\" />"],
+    ["confetti","庆祝","派对","<path d=\"M4 5h2\" /><path d=\"M5 4v2\" /><path d=\"M11.5 4l-.5 2\" /><path d=\"M18 5h2\" /><path d=\"M19 4v2\" /><path d=\"M15 9l-1 1\" /><path d=\"M18 13l2 -.5\" /><path d=\"M18 19h2\" /><path d=\"M19 18v2\" /><path d=\"M14 16.518l-6.518 -6.518l-4.39 9.58a1 1 0 0 0 1.329 1.329l9.579 -4.39\" />"],
+    ["friends","朋友","社交 聚会","<path d=\"M5 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M5 22v-5l-1 -1v-4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4l-1 1v5\" /><path d=\"M15 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M15 22v-4h-2l2 -6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1l2 6h-2v4\" />"],
+    ["heart","心愿","爱心 喜欢","<path d=\"M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572\" />"],
+    ["sparkles","闪光","星星","<path d=\"M16 18a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m0 -12a2 2 0 0 1 2 2a2 2 0 0 1 2 -2a2 2 0 0 1 -2 -2a2 2 0 0 1 -2 2m-7 12a6 6 0 0 1 6 -6a6 6 0 0 1 -6 -6a6 6 0 0 1 -6 6a6 6 0 0 1 6 6\" />"],
+    ["wallet","钱包","其他","<path d=\"M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12\" /><path d=\"M20 12v4h-4a2 2 0 0 1 0 -4h4\" />"],
+    ["shopping-cart","购物车","百货","<path d=\"M4 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M15 19a2 2 0 1 0 4 0a2 2 0 1 0 -4 0\" /><path d=\"M17 17h-11v-14h-2\" /><path d=\"M6 5l14 1l-1 7h-13\" />"],
+    ["credit-card","信用卡","支付","<path d=\"M3 8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -8\" /><path d=\"M3 10l18 0\" /><path d=\"M7 15l.01 0\" /><path d=\"M11 15l2 0\" />"],
+    ["pig-money","储蓄罐","存钱","<path d=\"M15 11v.01\" /><path d=\"M5.173 8.378a3 3 0 1 1 4.656 -1.377\" /><path d=\"M16 4v3.803a6.019 6.019 0 0 1 2.658 3.197h1.341a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-1.342c-.336 .95 -.907 1.8 -1.658 2.473v2.027a1.5 1.5 0 0 1 -3 0v-.583a6.04 6.04 0 0 1 -1 .083h-4a6.04 6.04 0 0 1 -1 -.083v.583a1.5 1.5 0 0 1 -3 0v-2l0 -.027a6 6 0 0 1 4 -10.473h2.5l4.5 -3\" />"],
+    ["tag","标签","优惠 折扣","<path d=\"M6.5 7.5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0\" /><path d=\"M3 6v5.172a2 2 0 0 0 .586 1.414l7.71 7.71a2.41 2.41 0 0 0 3.408 0l5.592 -5.592a2.41 2.41 0 0 0 0 -3.408l-7.71 -7.71a2 2 0 0 0 -1.414 -.586h-5.172a3 3 0 0 0 -3 3\" />"]
+  ]
+};
+const TABLER_ICONS = new Map();
+for (const rows of Object.values(TABLER_GROUPS)) {
+  for (const [slug, label, keywords, shape] of rows) {
+    TABLER_ICONS.set('tabler:' + slug, {label, shape, search: [slug, label, keywords].join(' ').toLowerCase()});
+  }
+}
+const LEGACY_GLYPH_LABELS = {
+  spark: '闪光', food: '小食', burger: '汉堡', meal: '套餐',
+  coffee: '咖啡', heart: '心愿', wallet: '其他'
+};
+const isLegacyGlyph = glyph => typeof glyph === 'string' && Object.hasOwn(ICONS, glyph);
+const isTablerGlyph = glyph => typeof glyph === 'string' && glyph.length <= 80
+  && /^tabler:[a-z0-9]+(?:-[a-z0-9]+)*$/.test(glyph);
+// Version 1 readers recognize the fallback and preserve the optional iconId
+// in backups and sync. An older editor can still select a different legacy glyph.
+const shortcutGlyph = shortcut => shortcut.glyph === 'spark'
+  ? shortcut.iconId || shortcut.glyph
+  : shortcut.glyph;
+function icon(name) {
+  const shape = TABLER_ICONS.get(name)?.shape || (Object.hasOwn(ICONS, name) ? ICONS[name] : ICONS.spark);
+  return svg(shape);
+}
+
 ICONS.moon='<path d="M20.5 13A8.5 8.5 0 0 1 11 3.5 8.5 8.5 0 1 0 20.5 13Z"/>';
 ICONS.sun='<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>';
 ICONS.monitor='<rect x="3" y="4" width="18" height="13" rx="1"/><path d="M8 21h8m-4-4v4"/>';
@@ -336,11 +626,40 @@ themeMedia?.addEventListener?.('change',()=>{if(themeChoice==='system'){applyThe
 
 let revisionClock=0;
 function stamp(obj){revisionClock=Math.max(Date.now(),revisionClock+1,(Date.parse(obj.updatedAt)||0)+1);return {...obj,updatedAt:new Date(revisionClock).toISOString(),rev:uid(),deleted:!!obj.deleted}}
-function defaults(){const categoryData=[['food','外卖与正餐','#e94d35'],['drinks','饮料','#244ee8'],['snacks','零食','#f5d34e'],['fun','娱乐','#b7d66b'],['other','其他','#83877c']];const q=[['poutine','Poutine',1068,'food','#244ee8','food'],['burger','汉堡',1129,'food','#e94d35','burger'],['meal','汉堡套餐',1599,'food','#f5d34e','meal'],['coffee','咖啡',450,'drinks','#b7d66b','coffee']];const seed=o=>({...o,updatedAt:'2026-01-01T00:00:00.000Z',rev:'seed-v1',deleted:false});return {version:SCHEMA,entities:{transactions:[],goals:[],categories:categoryData.map(([id,name,color])=>seed({id,name,color})),quick:q.map(([id,name,amount,categoryId,color,glyph],order)=>seed({id,name,amount,categoryId,color,glyph,order,tax:1300,beforeTax:false})),preferences:[seed({id:'main',primaryGoal:null,defaultTax:1300,reachThreshold:75})]},meta:{lastExport:null,lastSync:null}}}
+const EXTRA_CATEGORIES = [
+  ['builtin-tech', '数码科技', '#566be0'],
+  ['builtin-peripherals', '电脑外设', '#7696bb'],
+  ['builtin-audio-photo', '音频摄影', '#9b79bc'],
+  ['builtin-home', '家居生活', '#6e9b77'],
+  ['builtin-fashion', '服饰配件', '#c87189'],
+  ['builtin-transport', '交通出行', '#3c9d9d'],
+  ['builtin-study-office', '学习办公', '#c39742'],
+  ['builtin-sports-health', '运动健康', '#96ad55'],
+  ['builtin-travel', '旅行体验', '#db8d54'],
+  ['builtin-care', '个人护理', '#bd92a7'],
+  ['builtin-gifts', '社交礼物', '#cb6f5b']
+];
+const seedEntity = entry => ({
+  ...entry,
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  rev: 'seed-v1',
+  deleted: false
+});
+// Stable seed IDs merge across devices. Tombstones are entries too, so a
+// previously removed default does not reappear on reload or backup restore.
+function addMissingCategories(ledger) {
+  const categories = ledger.entities.categories;
+  const present = new Set(categories.map(category => category.id));
+  for (const [id, name, color] of EXTRA_CATEGORIES) {
+    if (!present.has(id)) categories.push(seedEntity({id, name, color}));
+  }
+  return ledger;
+}
+function defaults(){const categoryData=[['food','外卖与正餐','#e94d35'],['drinks','饮料','#244ee8'],['snacks','零食','#f5d34e'],['fun','娱乐','#b7d66b'],['other','其他','#83877c']];const q=[['poutine','Poutine',1068,'food','#244ee8','food'],['burger','汉堡',1129,'food','#e94d35','burger'],['meal','汉堡套餐',1599,'food','#f5d34e','meal'],['coffee','咖啡',450,'drinks','#b7d66b','coffee']];return addMissingCategories({version:SCHEMA,entities:{transactions:[],goals:[],categories:categoryData.map(([id,name,color])=>seedEntity({id,name,color})),quick:q.map(([id,name,amount,categoryId,color,glyph],order)=>seedEntity({id,name,amount,categoryId,color,glyph,order,tax:1300,beforeTax:false})),preferences:[seedEntity({id:'main',primaryGoal:null,defaultTax:1300,reachThreshold:75})]},meta:{lastExport:null,lastSync:null}})}
 const amountOf=q=>q.beforeTax?taxed(q.amount,q.tax):q.amount;
 const goalCost=g=>taxed(g.price,g.tax)+g.shipping;
 let storageOK=true,storageProblem='',data;
-try{const raw=localStorage.getItem(STORE);data=raw?validateBackup(JSON.parse(raw)):defaults()}catch(e){storageOK=false;storageProblem='无法读取原有本地数据：'+e.message+'。请先导出当前数据，检查浏览器存储权限；原存储不会被自动覆盖。';data=defaults()}
+try{const raw=localStorage.getItem(STORE);data=raw?addMissingCategories(validateBackup(JSON.parse(raw))):defaults()}catch(e){storageOK=false;storageProblem='无法读取原有本地数据：'+e.message+'。请先导出当前数据，检查浏览器存储权限；原存储不会被自动覆盖。';data=defaults()}
 let storageReadBlocked=!storageOK;
 const active=key=>data.entities[key].filter(o=>!o.deleted);
 const find=(key,id)=>data.entities[key].find(o=>o.id===id&&!o.deleted);
@@ -376,7 +695,7 @@ function goalArt(g){if(g?.image)return `<div class="goal-art"><img src="${esc(g.
 function dashboardView(){const s=stats(),g=mainGoal(),q=orderedQuick(),total=earned(),parts=dollars(total).split('.'),last=records()[0];return intro('YOUR EVERYDAY, REIMAGINED.','小小积累，<em>大有所期。</em>',`<p class="intro-note">把今天省下的，<br>留给真正想要的。</p>`)+`
 <div class="hero"><div class="hero-main"><div class="hero-meta"><span class="label">TOTAL SAVED / 累计储蓄</span><span class="tiny-badge">${savings().length} 次小小选择</span></div><div class="balance num ${parts[0].length>6?'long-balance':''}" aria-label="累计储蓄 ${money(total)}"><span class="currency">CAD $</span>${Number(parts[0]).toLocaleString('en-CA')}<span class="decimals">.${parts[1]}</span></div><div class="hero-caption">${total?`每一笔，都是在靠近理想生活。`:'从一杯咖啡开始，让心愿慢慢发生。'} <span class="desktop-only">· 可用余额 ${money(balance())}</span></div><div class="hero-stats">${[['TODAY / 今日',s.today],['THIS WEEK / 本周',s.week],['THIS MONTH / 本月',s.month]].map(([label,value])=>`<div class="mini-stat"><span class="label">${label}</span><strong class="num">${money(value)}</strong></div>`).join('')}</div></div><div class="hero-poster"><span class="poster-kicker">THE ART OF WANTING MORE.</span><p class="poster-slogan">Save small.<br><em>Dream big.</em></p><div class="poster-bottom"><span>MAKE ROOM FOR WHAT MATTERS.</span>${icon('arrowup')}</div><div class="poster-shape" aria-hidden="true"></div></div></div>
 ${sectionTitle('01','省下一笔','QUICK SAVE',`<button class="text-btn" data-action="manage-quick">${icon(manageQuick?'check':'edit')}${manageQuick?'完成管理':'管理项目'}</button>`)}
-<div class="quick-grid">${q.map((item,i)=>{const card=`<button class="quick-card" style="--card:${item.color};--card-ink:${contrast(item.color)}" data-action="${manageQuick?'edit-quick':'quick-save'}" data-id="${esc(item.id)}" aria-label="${manageQuick?'编辑':'记录省下'} ${esc(item.name)} ${money(amountOf(item))}"><span class="quick-top">${icon(item.glyph)}<span class="plus-mark">${manageQuick?'':'+'}</span></span><span><span class="quick-name" style="display:block">${esc(item.name)}</span><span class="quick-amount num">${money(amountOf(item))}</span>${item.beforeTax?'<span class="quick-tax" style="display:block">含 '+(item.tax/100)+'% 税</span>':''}</span></button>`;return manageQuick?`<div class="quick-manage-card">${card}<div class="quick-actions"><button data-action="move-quick" data-id="${esc(item.id)}" data-dir="-1" aria-label="向前移动 ${esc(item.name)}" ${i===0?'disabled':''}>${icon('up')}</button><button data-action="move-quick" data-id="${esc(item.id)}" data-dir="1" aria-label="向后移动 ${esc(item.name)}" ${i===q.length-1?'disabled':''}>${icon('down')}</button><button data-action="delete-quick" data-id="${esc(item.id)}" aria-label="删除 ${esc(item.name)}">${icon('trash')}</button></div></div>`:card}).join('')}${customAmountCard()}${!q.length?`<button class="quick-card" style="--card:#e9e9df;--card-ink:var(--ink)" data-action="add-quick">${icon('plus')}<span>添加你的第一个快捷项目</span></button>`:''}</div>
+<div class="quick-grid">${q.map((item,i)=>{const card=`<button class="quick-card" style="--card:${item.color};--card-ink:${contrast(item.color)}" data-action="${manageQuick?'edit-quick':'quick-save'}" data-id="${esc(item.id)}" aria-label="${manageQuick?'编辑':'记录省下'} ${esc(item.name)} ${money(amountOf(item))}"><span class="quick-top">${icon(shortcutGlyph(item))}<span class="plus-mark">${manageQuick?'':'+'}</span></span><span><span class="quick-name" style="display:block">${esc(item.name)}</span><span class="quick-amount num">${money(amountOf(item))}</span>${item.beforeTax?'<span class="quick-tax" style="display:block">含 '+(item.tax/100)+'% 税</span>':''}</span></button>`;return manageQuick?`<div class="quick-manage-card">${card}<div class="quick-actions"><button data-action="move-quick" data-id="${esc(item.id)}" data-dir="-1" aria-label="向前移动 ${esc(item.name)}" ${i===0?'disabled':''}>${icon('up')}</button><button data-action="move-quick" data-id="${esc(item.id)}" data-dir="1" aria-label="向后移动 ${esc(item.name)}" ${i===q.length-1?'disabled':''}>${icon('down')}</button><button data-action="delete-quick" data-id="${esc(item.id)}" aria-label="删除 ${esc(item.name)}">${icon('trash')}</button></div></div>`:card}).join('')}${customAmountCard()}${!q.length?`<button class="quick-card" style="--card:#e9e9df;--card-ink:var(--ink)" data-action="add-quick">${icon('plus')}<span>添加你的第一个快捷项目</span></button>`:''}</div>
 <div class="quick-toolbar"><span class="hint">${icon('check')}点击即存，随时可撤销 <span class="kbd">⌘ Z</span></span><div style="display:flex;gap:17px"><button class="text-btn" data-action="add-quick">${icon('plus')}新增项目</button></div></div>
 <div class="dashboard-bottom"><section>${sectionTitle('02','下一个心愿','NEXT PURCHASE',`<button class="text-btn" data-action="route" data-route="wishlist" aria-label="查看梦想清单">${icon('arrow')}</button>`)}<div class="goal-feature">${g?`<div class="goal-feature-top"><div><span class="label muted">${esc(g.category||'MY NEXT CHAPTER')}</span><h3 class="goal-feature-name">${esc(g.name)}</h3><span class="small muted">目标 ${money(goalCost(g))} · 含税及运费</span></div>${goalArt(g)}</div>${progressMarkup(g)}`:`<div class="goal-feature-top"><div><span class="label muted">YOUR NEXT CHAPTER</span><h3 class="goal-empty-title">给下一个心愿，<br>留一点可能。</h3></div><div class="goal-blank" aria-hidden="true"></div></div><button class="text-btn" data-action="add-goal">设定第一个目标 ${icon('arrow')}</button><div class="goal-foot"><span>不必着急，从想要的生活开始。</span><span>01 / A NEW BEGINNING</span></div>`}</div><div class="small muted" style="margin-top:10px">可用余额 <strong class="num" style="color:var(--ink)">${money(balance())}</strong>${g?' · 所有心愿共享这一笔资金':''}</div></section><section>${sectionTitle('03','最近足迹','RECENT ACTIVITY',`<button class="text-btn" data-action="route" data-route="activity" aria-label="查看完整历史">${icon('arrow')}</button>`)}<div class="activity-preview">${records().slice(0,3).map(t=>activityRow(t,false)).join('')||empty('第一笔积累，等你开始。','点击上方彩色卡片，记下今天省下的一笔。','clock')}</div>${last?`<p class="small muted" style="margin-top:12px">最近一次 · ${dateTime(last.date)}</p>`:''}</section></div>`}
 function activityRow(t,full){return `<div class="activity-row"><span class="activity-symbol" style="background:${categoryInk(t.categoryId)}20;color:${categoryInk(t.categoryId)}">${icon(t.type==='save'?'plus':t.type==='purchase'?'heart':'wallet')}</span><div class="activity-info"><div class="activity-name">${esc(t.name)}</div><div class="activity-sub">${new Date(t.date).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})} · ${t.type==='save'?esc(cat(t.categoryId).name):t.type==='purchase'?'购买心愿':t.type==='expense'?'支出':'余额调整'}${full?' · '+dateLabel(t.date):''}${t.tax?.enabled?' · 含 '+t.tax.rate/100+'% 税':''}</div>${full&&t.note?`<div class="activity-note">${esc(t.note)}</div>`:''}</div><strong class="activity-amount ${t.amount>0?'positive':''}">${money(t.amount,true)}</strong>${full?`<div class="row-actions"><button class="icon-btn" data-action="edit-record" data-id="${esc(t.id)}" aria-label="编辑 ${esc(t.name)}">${icon('edit')}</button><button class="icon-btn" data-action="delete-record" data-id="${esc(t.id)}" aria-label="删除 ${esc(t.name)}">${icon('trash')}</button></div>`:''}</div>`}
@@ -425,7 +744,91 @@ function categoryField(selected){return selectField('储蓄类别','categoryId',
 function noteField(value=''){return `<div class="field"><label for="form-note">备注 <span class="muted">/ 可选</span></label><textarea name="note" id="form-note" maxlength="2000" placeholder="记录一点此刻的想法…">${esc(value)}</textarea></div>`}
 function formFoot(label='保存'){return `<div class="form-error" hidden></div><div class="modal-actions"><button class="btn light" type="button" data-action="close-modal">取消</button><button class="btn blue" type="submit">${label}</button></div>`}
 function colorField(color){return `<div class="field"><label for="form-color">卡片颜色</label><div class="color-options">${SWATCHES.map(s=>`<button type="button" class="color-choice ${color===s?'selected':''}" style="--swatch:${s}" data-action="color" data-color="${s}" aria-label="选择颜色 ${s}" aria-pressed="${color===s}"></button>`).join('')}<input type="color" id="form-color" name="color" value="${esc(color)}" aria-label="自定义颜色"></div></div>`}
-function editQuick(id){const q=find('quick',id)||{id:uid(),name:'',amount:0,categoryId:'food',color:SWATCHES[orderedQuick().length%SWATCHES.length],glyph:'spark',order:Math.max(-1,...orderedQuick().map(q=>q.order))+1,tax:pref().defaultTax,beforeTax:false};openModal(id?'编辑快捷项目':'省下的，有很多种。','QUICK SAVE / YOUR WAY',`<form id="quick-form" data-id="${esc(q.id)}">${inputField('项目名称','name',q.name,'required maxlength="80" autofocus placeholder="例如：下午的咖啡"')}<div class="field-row">${inputField('金额（CAD）','amount',q.amount?dollars(q.amount):'','type="number" min=".01" max="999999999.99" step=".01" required placeholder="0.00"')}${selectField('金额方式','beforeTax',[['false','已含税 / 最终金额'],['true','税前金额 / 自动加税']],String(q.beforeTax))}</div><div class="field-row">${categoryField(q.categoryId)}${inputField('适用税率（%）','tax',q.tax/100,'type="number" min="0" max="100" step=".01" required')}</div><div class="calc-preview"><span>每次点击省下</span><strong class="num" id="calc-total">${money(amountOf(q))}</strong></div>${colorField(q.color)}${selectField('卡片图标','glyph',[['spark','闪光'],['food','小食'],['burger','汉堡'],['meal','套餐'],['coffee','咖啡'],['heart','心愿'],['wallet','其他']],q.glyph)}${formFoot(id?'保存修改':'添加快捷项目')}</form>`)}
+function glyphLabel(glyph) {
+  return TABLER_ICONS.get(glyph)?.label
+    || (Object.hasOwn(LEGACY_GLYPH_LABELS, glyph) ? LEGACY_GLYPH_LABELS[glyph] : '原有图标');
+}
+function glyphField(glyph, color) {
+  return `<div class="field"><details class="glyph-picker">
+    <summary><span class="glyph-current" style="--glyph-bg:${esc(color)};--glyph-ink:${contrast(color)}">${icon(glyph)}</span>
+      <span class="glyph-summary"><span>卡片图标</span><strong class="glyph-current-name">${esc(glyphLabel(glyph))}</strong></span>
+      ${icon('down')}
+    </summary>
+    <input type="hidden" name="glyph" value="${esc(glyph)}">
+    <div class="glyph-picker-tools">
+      <input id="glyph-search" type="search" autocomplete="off" aria-label="搜索图标" placeholder="搜索图标，如咖啡、相机、键盘">
+      <select id="glyph-group" aria-label="图标分组"><option value="">全部分组</option>
+        ${Object.keys(TABLER_GROUPS).map(group => `<option value="${group}">${group}</option>`).join('')}
+      </select>
+    </div>
+    <div class="glyph-results"></div>
+    <p class="glyph-empty small muted" role="status" hidden>没有找到图标，请试试其他关键词或分组。</p>
+    <span class="glyph-status" role="status"></span>
+  </details></div>`;
+}
+function fillGlyphPicker(picker) {
+  const selected = $('[name=glyph]', picker).value;
+  const option = id => {
+    const label = esc(glyphLabel(id));
+    return `<button type="button" class="glyph-choice" data-action="pick-glyph" data-id="${esc(id)}"
+      aria-pressed="${selected === id}" title="${label}">${icon(id)}<span>${label}</span></button>`;
+  };
+  const groups = Object.entries(TABLER_GROUPS);
+  const current = TABLER_ICONS.has(selected) ? '' : `<section class="glyph-group" data-group="原有图标" aria-label="原有图标">
+    <h4>原有图标</h4><div class="glyph-grid">${option(selected)}</div></section>`;
+  $('.glyph-results', picker).innerHTML = current + groups.map(([group, rows]) => `
+    <section class="glyph-group" data-group="${group}" aria-label="${group}">
+      <h4>${group}</h4>
+      <div class="glyph-grid">${rows.map(([slug]) => option('tabler:' + slug)).join('')}</div>
+    </section>`).join('');
+  filterGlyphPicker(picker);
+}
+function filterGlyphPicker(picker) {
+  const query = $('#glyph-search', picker).value.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const group = $('#glyph-group', picker).value;
+  let matched = false;
+  for (const section of $$('.glyph-group', picker)) {
+    let groupMatches = false;
+    for (const button of $$('.glyph-choice', section)) {
+      const id = button.dataset.id;
+      const searchable = (TABLER_ICONS.get(id)?.search || glyphLabel(id)) + ' ' + section.dataset.group;
+      const visible = (!group || section.dataset.group === group) && query.every(word => searchable.includes(word));
+      button.hidden = !visible;
+      groupMatches ||= visible;
+    }
+    section.hidden = !groupMatches;
+    matched ||= groupMatches;
+  }
+  $('.glyph-empty', picker).hidden = matched;
+  $('.glyph-results', picker).scrollTop = 0;
+}
+function chooseGlyph(button) {
+  const id = button.dataset.id;
+  if (!isLegacyGlyph(id) && !isTablerGlyph(id)) return;
+  const picker = button.closest('.glyph-picker');
+  $('[name=glyph]', picker).value = id;
+  $('.glyph-current', picker).innerHTML = icon(id);
+  const label = glyphLabel(id);
+  $('.glyph-current-name', picker).textContent = label;
+  $('.glyph-status', picker).textContent = '已选择 ' + label;
+  for (const choice of $$('.glyph-choice', picker)) {
+    choice.setAttribute('aria-pressed', String(choice === button));
+  }
+}
+function updateGlyphPreview(form, color) {
+  const preview = $('.glyph-current', form);
+  if (!preview) return;
+  preview.style.setProperty('--glyph-bg', color);
+  preview.style.setProperty('--glyph-ink', contrast(color));
+}
+document.addEventListener('keydown', event => {
+  if (event.target.id === 'glyph-search' && event.key === 'Enter' && !event.isComposing) event.preventDefault();
+});
+document.addEventListener('toggle', event => {
+  const picker = event.target;
+  if (picker.matches?.('.glyph-picker[open]') && !$('.glyph-group', picker)) fillGlyphPicker(picker);
+}, true);
+function editQuick(id){const q=find('quick',id)||{id:uid(),name:'',amount:0,categoryId:'food',color:SWATCHES[orderedQuick().length%SWATCHES.length],glyph:'spark',iconId:'tabler:sparkles',order:Math.max(-1,...orderedQuick().map(q=>q.order))+1,tax:pref().defaultTax,beforeTax:false};openModal(id?'编辑快捷项目':'省下的，有很多种。','QUICK SAVE / YOUR WAY',`<form id="quick-form" data-id="${esc(q.id)}">${inputField('项目名称','name',q.name,'required maxlength="80" autofocus placeholder="例如：下午的咖啡"')}<div class="field-row">${inputField('金额（CAD）','amount',q.amount?dollars(q.amount):'','type="number" min=".01" max="999999999.99" step=".01" required placeholder="0.00"')}${selectField('金额方式','beforeTax',[['false','已含税 / 最终金额'],['true','税前金额 / 自动加税']],String(q.beforeTax))}</div><div class="field-row">${categoryField(q.categoryId)}${inputField('适用税率（%）','tax',q.tax/100,'type="number" min="0" max="100" step=".01" required')}</div><div class="calc-preview"><span>每次点击省下</span><strong class="num" id="calc-total">${money(amountOf(q))}</strong></div>${colorField(q.color)}${glyphField(shortcutGlyph(q),q.color)}${formFoot(id?'保存修改':'添加快捷项目')}</form>`)}
 function editGoal(id){const g=find('goals',id)||{id:uid(),name:'',price:0,tax:pref().defaultTax,shipping:0,category:'',note:'',image:''};openModal(id?'编辑心愿':'下一份期待，是什么？','WISHLIST / DREAM WITH INTENTION',`<form id="goal-form" data-id="${esc(g.id)}">${inputField('心愿名称','name',g.name,'required maxlength="100" autofocus placeholder="例如：一台一直想要的相机"')}<div class="field-row">${inputField('商品税前价格（CAD）','price',g.price?dollars(g.price):'','type="number" min=".01" max="999999999.99" step=".01" required placeholder="0.00"')}${inputField('税率（%）','tax',g.tax/100,'type="number" min="0" max="100" step=".01" required')}</div><div class="field-row">${inputField('运费（CAD，最终含税）','shipping',dollars(g.shipping),'type="number" min="0" max="999999999.99" step=".01" required')}${inputField('商品类别','category',g.category,'maxlength="50" placeholder="摄影 / 旅行 / 生活…"')}</div><div class="calc-preview"><span>目标总金额 · CAD</span><strong class="num" id="calc-total">${money(goalCost(g))}</strong></div><div class="field"><label for="form-image">商品图片 <span class="muted">/ 可选，建议小于 2 MB</span></label><input type="file" id="form-image" name="image" accept="image/png,image/jpeg,image/webp"><p class="helper">图片会压缩并保存在本地，备份可完整带走。</p>${g.image?`<label class="check-label" style="margin-top:9px"><input type="checkbox" name="removeImage">移除现有图片</label>`:''}</div>${noteField(g.note)}<div class="field"><label class="check-label"><input type="checkbox" name="primary" ${(!pref().primaryGoal||pref().primaryGoal===g.id)?'checked':''}>设为首页主要目标</label></div>${formFoot(id?'保存心愿':'添加心愿')}</form>`)}
 
 /* 11 — Touch amount dial. Two virtual wheels render seven rows each, even for large sums.
@@ -473,7 +876,7 @@ function formError(form,message){const target=$('.form-error',form);if(target){t
 function requiredName(v){v=String(v||'').trim();if(!v)throw Error('请填写名称。');return v}
 function checkTotal(n){if(n<=0||n>MAX_CENTS||!Number.isSafeInteger(n))throw Error('请输入大于零且在范围内的金额。');return n}
 async function compressImage(file){if(!file||!file.size)return '';if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('请选择 PNG、JPEG 或 WebP 图片。');if(file.size>10*1024*1024)throw Error('图片过大，请选择小于 10 MB 的文件。');const url=URL.createObjectURL(file);try{const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('无法读取这张图片。'));img.src=url});const canvas=document.createElement('canvas'),scale=Math.min(1,480/Math.max(img.naturalWidth,img.naturalHeight));canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));const ctx=canvas.getContext('2d');ctx.fillStyle='#fffef9';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);return canvas.toDataURL('image/jpeg',.8)}finally{URL.revokeObjectURL(url)}}
-document.addEventListener('submit',async e=>{e.preventDefault();const form=e.target;if(!form.reportValidity())return;const f=new FormData(form),id=form.dataset.id;const submit=$('button[type=submit]',form);if(submit)submit.disabled=true;try{switch(form.id){case 'quick-form':{const old=find('quick',id),base=checkTotal(cents(f.get('amount'))),tax=basis(f.get('tax')),beforeTax=f.get('beforeTax')==='true';checkTotal(beforeTax?taxed(base,tax):base);const q={...(old||{}),id,name:requiredName(f.get('name')),amount:base,tax,beforeTax,categoryId:f.get('categoryId'),color:f.get('color'),glyph:f.get('glyph'),order:old?.order??Math.max(-1,...orderedQuick().map(q=>q.order))+1};closeModal();put('quick',q,'快捷项目已保存。');break}
+document.addEventListener('submit',async e=>{e.preventDefault();const form=e.target;if(!form.reportValidity())return;const f=new FormData(form),id=form.dataset.id;const submit=$('button[type=submit]',form);if(submit)submit.disabled=true;try{switch(form.id){case 'quick-form':{const old=find('quick',id),base=checkTotal(cents(f.get('amount'))),tax=basis(f.get('tax')),beforeTax=f.get('beforeTax')==='true',glyph=f.get('glyph');if(!isLegacyGlyph(glyph)&&!isTablerGlyph(glyph))throw Error('请选择有效的卡片图标。');checkTotal(beforeTax?taxed(base,tax):base);const q={...(old||{}),id,name:requiredName(f.get('name')),amount:base,tax,beforeTax,categoryId:f.get('categoryId'),color:f.get('color'),glyph:isTablerGlyph(glyph)?'spark':glyph,iconId:isTablerGlyph(glyph)?glyph:undefined,order:old?.order??Math.max(-1,...orderedQuick().map(q=>q.order))+1};closeModal();put('quick',q,'快捷项目已保存。');break}
 case 'goal-form':{const old=find('goals',id),price=checkTotal(cents(f.get('price'))),tax=basis(f.get('tax')),shipping=cents(f.get('shipping'));checkTotal(taxed(price,tax)+shipping);const image=f.get('image').size?await compressImage(f.get('image')):f.get('removeImage')?'':old?.image||'';const g={...(old||{}),id,name:requiredName(f.get('name')),price,tax,shipping,category:String(f.get('category')).trim(),note:String(f.get('note')).trim(),image};const changes=[{key:'goals',value:g}];if(f.get('primary'))changes.push({key:'preferences',value:{...pref(),primaryGoal:id}});else if(pref().primaryGoal===id)changes.push({key:'preferences',value:{...pref(),primaryGoal:null}});closeModal();change(changes,'心愿已保存。');break}
 case 'record-form':{const old=find('transactions',id),type=f.get('type'),raw=cents(String(f.get('amount')).trim().replace(/\.$/,'.0'),type==='adjustment');if(!raw)throw Error('金额不能为零。');if(type!=='adjustment')checkTotal(raw);const rate=f.get('taxRate')===null?AmountTax.currentRate():Number(f.get('taxRate')),tax=AmountTax.snapshot(Math.abs(raw),rate,f.get('autoTax')==='on'),total=AmountTax.total(tax.baseAmount,tax.rate,tax.enabled),amount=type==='purchase'||type==='expense'||raw<0?-total:total;const date=new Date(f.get('date'));if(!Number.isFinite(date.getTime()))throw Error('请选择有效时间。');if(date.getTime()>Date.now()+60000)throw Error('记录时间不能在未来。');const t={...(old||{}),id,type,amount,tax,date:date.toISOString(),name:String(f.get('name')||'').trim()||(type==='save'?'任意储蓄':type==='expense'?'日常支出':type==='purchase'?'购买心愿':'余额调整'),categoryId:f.get('categoryId'),note:String(f.get('note')).trim(),...(!old?{source:'custom'}:{})};if(old?.quickId&&old.name!==t.name)delete t.quickId;closeModal();put('transactions',t,old?'记录已更新。':`已记录 ${money(amount,true)}`,{celebrate:type==='save'&&!old?amount:0});if(type==='save'&&!old)animateSave(amount);break}
 case 'category-form':{const c={...(find('categories',id)||{}),id,name:requiredName(f.get('name')),color:f.get('color')};closeModal();put('categories',c,'分类已保存。');break}
@@ -482,22 +885,22 @@ case 'cloud-config-form':{const u=new URL(f.get('url'));if(u.protocol!=='https:'
 case 'cloud-email-form':{if(location.protocol==='file:')throw Error('请在 https://weizikundavidwei.github.io/savings/ 中发起 Magic Link 登录，才能在返回时验证同一浏览器。');if(!cloud.url||!cloud.key)throw Error('请先保存云端项目配置。');if(otpWaitSeconds()>0)throw Error('请稍等 '+otpWaitSeconds()+' 秒再重新发送。');const generation=cloudGeneration,email=String(f.get('email')).trim(),client=getSupabaseClient();const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:AUTH_REDIRECT_URL,shouldCreateUser:true}});if(error)throw error;if(generation!==cloudGeneration)throw Error('连接信息已更改，请重新发送登录链接。');cloud.email=email;cloud.otpSentAt=Date.now();cloud.authEmailMode='magiclink';authError='';delete cloudDraft.token;cloudDraft.email=email;saveCloud();render();toast('登录链接已发送，请在同一浏览器打开邮件中的链接。',false);break}
 case 'cloud-verify-form':{if(!cloud.email)throw Error('请先填写邮箱并发送登录邮件。');const generation=cloudGeneration,client=getSupabaseClient();const {data:result,error}=await client.auth.verifyOtp({email:cloud.email,token:String(f.get('token')).trim(),type:'email'});if(error)throw error;if(generation!==cloudGeneration)throw Error('连接信息已更改，请重新登录。');if(!result?.session)throw Error('登录响应无效，请重试。');acceptAuthSession(result.session);cloudDraft={};authError='';render();toast('邮箱验证成功，正在同步。',false);queueSync();break}
 }}catch(error){formError(form,form.id.startsWith('cloud-')?cloudErrorMessage(error):error.message)}finally{if(submit?.isConnected)submit.disabled=false;updateOtpCountdown()}});
-document.addEventListener('input',e=>{if(e.target.id==='form-amount'&&e.target.closest('.amount-form'))updateAmountFromInput();if(e.target.closest('#cloud-config-form,#cloud-email-form,#cloud-verify-form')&&e.target.name)cloudDraft[e.target.name]=e.target.value;if(e.target.closest('#quick-form,#goal-form'))updateCalc();if(e.target.type==='color'){$$('.color-choice',e.target.closest('.field')).forEach(b=>{b.classList.toggle('selected',b.dataset.color===e.target.value);b.setAttribute('aria-pressed',b.dataset.color===e.target.value)})}});
-document.addEventListener('change',e=>{if(e.target.id==='pure-black-toggle')setPureBlack(e.target.checked);if(e.target.id==='entry-auto-tax'&&amountEditor){stopAmountInertia();amountEditor.autoTax=e.target.checked;updateAmountUI()}if(e.target.dataset.filter){filters[e.target.dataset.filter]=e.target.value;render()}if(e.target.closest('#quick-form,#goal-form'))updateCalc()});
-document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;switch(a){case 'entry-type':setEntryType(b.dataset.type);break;case 'entry-tab':selectEntryTab(b.dataset.tab);break;case 'amount-sign':if(amountEditor){setEntryAmount(amountEditor.cents,!amountEditor.negative);renderAmountWheels()}break;case 'load-amount':loadRecentAmount(id);break;case 'repeat-amount':repeatRecentAmount(id);break;case 'toggle-theme':setTheme(isDark()?'light':'dark');break;case 'set-theme':setTheme(b.dataset.theme);break;case 'copy-setup-sql':copySetup('sql');break;case 'copy-email-template':copySetup('email');break;case 'download-setup-sql':downloadSetupSQL();break;case 'route':navigate(b.dataset.route);break;case 'quick-save':quickSave(id);break;case 'manage-quick':manageQuick=!manageQuick;render();break;case 'add-quick':editQuick();break;case 'edit-quick':editQuick(id);break;case 'delete-quick':{const q=find('quick',id);put('quick',{...q,deleted:true},'快捷项目已移除，历史记录保留。');break}case 'move-quick':{const q=orderedQuick(),i=q.findIndex(x=>x.id===id),j=i+Number(b.dataset.dir);if(j>=0&&j<q.length){[q[i],q[j]]=[q[j],q[i]];change(q.map((item,order)=>({key:'quick',value:{...item,order}})),'排列顺序已保存。')}break}case 'custom-save':editRecord();break;case 'edit-record':editRecord(id);break;case 'delete-record':{const t=find('transactions',id);put('transactions',{...t,deleted:true},'记录已删除，余额已重新计算。');break}case 'add-goal':editGoal();break;case 'edit-goal':editGoal(id);break;case 'delete-goal':{const g=find('goals',id);confirmAction('移除这个心愿？',`「${esc(g.name)}」将从清单移除，相关购买流水仍会保留。`,()=>put('goals',{...g,deleted:true},'心愿已移除。'),'移除心愿',true);break}case 'primary-goal':put('preferences',{...pref(),primaryGoal:id},'主要心愿已切换。');break;case 'purchase-goal':{const g=find('goals',id),cost=goalCost(g);if(purchased(g))return toast('这个心愿已经记录购买。',false);confirmAction('把心愿，带进生活。',`购买「${esc(g.name)}」将扣除 <strong>${money(cost)}</strong>，之后可用余额为 <strong>${money(balance()-cost)}</strong>。${balance()<cost?'<br><span style="color:var(--red)">当前余额不足，记录后余额会变为负数。</span>':''}`,()=>{if(purchased(g))return;put('transactions',{id:uid(),type:'purchase',name:g.name,amount:-cost,date:new Date().toISOString(),categoryId:'',goalId:g.id,note:'购买心愿 · 含税及运费'},'心愿已实现，购买支出已记录。');milestone('你做到了。让美好发生：'+g.name+' ✦')},'确认购买');break}case 'add-category':editCategory();break;case 'edit-category':editCategory(id);break;case 'delete-category':{const c=find('categories',id);confirmAction('删除这个分类？',`「${esc(c.name)}」对应的历史记录会归入未分类，金额保持不变。`,()=>put('categories',{...c,deleted:true},'分类已删除。'),'删除分类',true);break}case 'bar-period':barPeriod=b.dataset.period;render();break;case 'growth-period':growthPeriod=b.dataset.period;render();break;case 'bar-info':$('#bar-tooltip').textContent=b.dataset.info;break;case 'growth-info':$('#growth-tooltip').textContent=b.dataset.info;break;case 'category-activity':filters={from:'',to:'',item:'',category:id};navigate('activity');break;case 'clear-filters':filters={from:'',to:'',item:'',category:''};render();break;case 'close-modal':closeModal();break;case 'color':{const field=b.closest('.field');$('input[type=color]',field).value=b.dataset.color;$$('.color-choice',field).forEach(el=>{el.classList.toggle('selected',el===b);el.setAttribute('aria-pressed',el===b)});break}case 'undo':undo();break;case 'export':exportBackup();break;case 'import':$('#import-file').value='';$('#import-file').click();break;case 'import-merge':importBackup('merge');break;case 'import-replace':confirmAction('用备份替换本机数据？','当前本机数据将被替换。请先导出当前备份；替换后不能一键撤销。',()=>importBackup('replace'),'确认替换',true);break;case 'clear-data':if(cloud.session)return toast('请先退出云端账户，再清空本机数据。',false);confirmAction('清空本机的全部积累？','这会移除全部记录、心愿和自定义项目，并恢复默认设置。请先导出备份。此操作无法撤销。',()=>{data=defaults();storageReadBlocked=false;undoStack=[];filters={from:'',to:'',item:'',category:''};persist();render();toast('本机已恢复初始状态。',false)},'清空全部数据',true);break;case 'sync':syncNow();break;case 'signout':signOut();break}});
+document.addEventListener('input',e=>{if(e.target.id==='glyph-search')filterGlyphPicker(e.target.closest('.glyph-picker'));if(e.target.type==='color'&&e.target.closest('#quick-form'))updateGlyphPreview(e.target.form,e.target.value);if(e.target.id==='form-amount'&&e.target.closest('.amount-form'))updateAmountFromInput();if(e.target.closest('#cloud-config-form,#cloud-email-form,#cloud-verify-form')&&e.target.name)cloudDraft[e.target.name]=e.target.value;if(e.target.closest('#quick-form,#goal-form'))updateCalc();if(e.target.type==='color'){$$('.color-choice',e.target.closest('.field')).forEach(b=>{b.classList.toggle('selected',b.dataset.color===e.target.value);b.setAttribute('aria-pressed',b.dataset.color===e.target.value)})}});
+document.addEventListener('change',e=>{if(e.target.id==='glyph-group')filterGlyphPicker(e.target.closest('.glyph-picker'));if(e.target.id==='pure-black-toggle')setPureBlack(e.target.checked);if(e.target.id==='entry-auto-tax'&&amountEditor){stopAmountInertia();amountEditor.autoTax=e.target.checked;updateAmountUI()}if(e.target.dataset.filter){filters[e.target.dataset.filter]=e.target.value;render()}if(e.target.closest('#quick-form,#goal-form'))updateCalc()});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-action]');if(!b||b.disabled)return;const a=b.dataset.action,id=b.dataset.id;switch(a){case 'entry-type':setEntryType(b.dataset.type);break;case 'entry-tab':selectEntryTab(b.dataset.tab);break;case 'amount-sign':if(amountEditor){setEntryAmount(amountEditor.cents,!amountEditor.negative);renderAmountWheels()}break;case 'load-amount':loadRecentAmount(id);break;case 'repeat-amount':repeatRecentAmount(id);break;case 'toggle-theme':setTheme(isDark()?'light':'dark');break;case 'set-theme':setTheme(b.dataset.theme);break;case 'copy-setup-sql':copySetup('sql');break;case 'copy-email-template':copySetup('email');break;case 'download-setup-sql':downloadSetupSQL();break;case 'route':navigate(b.dataset.route);break;case 'quick-save':quickSave(id);break;case 'manage-quick':manageQuick=!manageQuick;render();break;case 'add-quick':editQuick();break;case 'edit-quick':editQuick(id);break;case 'delete-quick':{const q=find('quick',id);put('quick',{...q,deleted:true},'快捷项目已移除，历史记录保留。');break}case 'move-quick':{const q=orderedQuick(),i=q.findIndex(x=>x.id===id),j=i+Number(b.dataset.dir);if(j>=0&&j<q.length){[q[i],q[j]]=[q[j],q[i]];change(q.map((item,order)=>({key:'quick',value:{...item,order}})),'排列顺序已保存。')}break}case 'custom-save':editRecord();break;case 'edit-record':editRecord(id);break;case 'delete-record':{const t=find('transactions',id);put('transactions',{...t,deleted:true},'记录已删除，余额已重新计算。');break}case 'add-goal':editGoal();break;case 'edit-goal':editGoal(id);break;case 'delete-goal':{const g=find('goals',id);confirmAction('移除这个心愿？',`「${esc(g.name)}」将从清单移除，相关购买流水仍会保留。`,()=>put('goals',{...g,deleted:true},'心愿已移除。'),'移除心愿',true);break}case 'primary-goal':put('preferences',{...pref(),primaryGoal:id},'主要心愿已切换。');break;case 'purchase-goal':{const g=find('goals',id),cost=goalCost(g);if(purchased(g))return toast('这个心愿已经记录购买。',false);confirmAction('把心愿，带进生活。',`购买「${esc(g.name)}」将扣除 <strong>${money(cost)}</strong>，之后可用余额为 <strong>${money(balance()-cost)}</strong>。${balance()<cost?'<br><span style="color:var(--red)">当前余额不足，记录后余额会变为负数。</span>':''}`,()=>{if(purchased(g))return;put('transactions',{id:uid(),type:'purchase',name:g.name,amount:-cost,date:new Date().toISOString(),categoryId:'',goalId:g.id,note:'购买心愿 · 含税及运费'},'心愿已实现，购买支出已记录。');milestone('你做到了。让美好发生：'+g.name+' ✦')},'确认购买');break}case 'add-category':editCategory();break;case 'edit-category':editCategory(id);break;case 'delete-category':{const c=find('categories',id);confirmAction('删除这个分类？',`「${esc(c.name)}」对应的历史记录会归入未分类，金额保持不变。`,()=>put('categories',{...c,deleted:true},'分类已删除。'),'删除分类',true);break}case 'bar-period':barPeriod=b.dataset.period;render();break;case 'growth-period':growthPeriod=b.dataset.period;render();break;case 'bar-info':$('#bar-tooltip').textContent=b.dataset.info;break;case 'growth-info':$('#growth-tooltip').textContent=b.dataset.info;break;case 'category-activity':filters={from:'',to:'',item:'',category:id};navigate('activity');break;case 'clear-filters':filters={from:'',to:'',item:'',category:''};render();break;case 'close-modal':closeModal();break;case 'pick-glyph':chooseGlyph(b);break;case 'color':{const field=b.closest('.field');$('input[type=color]',field).value=b.dataset.color;if(b.closest('#quick-form'))updateGlyphPreview(b.closest('#quick-form'),b.dataset.color);$$('.color-choice',field).forEach(el=>{el.classList.toggle('selected',el===b);el.setAttribute('aria-pressed',el===b)});break}case 'undo':undo();break;case 'export':exportBackup();break;case 'import':$('#import-file').value='';$('#import-file').click();break;case 'import-merge':importBackup('merge');break;case 'import-replace':confirmAction('用备份替换本机数据？','当前本机数据将被替换。请先导出当前备份；替换后不能一键撤销。',()=>importBackup('replace'),'确认替换',true);break;case 'clear-data':if(cloud.session)return toast('请先退出云端账户，再清空本机数据。',false);confirmAction('清空本机的全部积累？','这会移除全部记录、心愿和自定义项目，并恢复默认设置。请先导出备份。此操作无法撤销。',()=>{data=defaults();storageReadBlocked=false;undoStack=[];filters={from:'',to:'',item:'',category:''};persist();render();toast('本机已恢复初始状态。',false)},'清空全部数据',true);break;case 'sync':syncNow();break;case 'signout':signOut();break}});
 function navigate(next){if(route===next)render();else location.hash=next;window.scrollTo(0,0)}
 window.addEventListener('hashchange',()=>{render();window.scrollTo(0,0)});
 document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey&&!$('#modal').open&&!e.target.matches('input,textarea,[contenteditable]')){e.preventDefault();undo()}if((e.key==='Enter'||e.key===' ')&&e.target.matches('g[data-action="growth-info"]')){e.preventDefault();$('#growth-tooltip').textContent=e.target.dataset.info}});
 document.addEventListener('mouseover',e=>{const b=e.target.closest('[data-action="bar-info"],[data-action="growth-info"]');if(b){const target=$(b.dataset.action==='bar-info'?'#bar-tooltip':'#growth-tooltip');if(target)target.textContent=b.dataset.info}});
 document.addEventListener('focusin',e=>{const b=e.target.closest('[data-action="bar-info"],[data-action="growth-info"]');if(b){const target=$(b.dataset.action==='bar-info'?'#bar-tooltip':'#growth-tooltip');if(target)target.textContent=b.dataset.info}});
 /* 06 — Strict backup validation & deterministic record-level merge. */
-function validateBackup(input){const d=clone(input?.data||input);if(!d||d.version!==SCHEMA||!d.entities||typeof d.entities!=='object')throw Error('不支持的备份格式或版本。');let size=0;for(const key of COLLECTIONS){if(!Array.isArray(d.entities[key]))throw Error('备份缺少 '+key+' 数据。');size+=d.entities[key].length;const ids=new Set();for(const o of d.entities[key]){if(!o||typeof o!=='object'||Array.isArray(o)||typeof o.id!=='string'||!o.id||o.id.length>200||ids.has(o.id))throw Error('备份含无效或重复的 ID。');ids.add(o.id);if(typeof o.updatedAt!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(o.updatedAt)||!Number.isFinite(Date.parse(o.updatedAt))||typeof o.rev!=='string'||!o.rev||o.rev.length>200||typeof o.deleted!=='boolean')throw Error('备份中的版本标记不完整。');if(o.deleted)continue;const text=(field,max=2000,required=false)=>{if(o[field]===undefined&&!required)return;if(typeof o[field]!=='string'||o[field].length>max||(required&&!o[field].trim()))throw Error('备份的 '+field+' 字段无效。')};const integer=(field,min=0,max=MAX_CENTS)=>{if(!Number.isSafeInteger(o[field])||o[field]<min||o[field]>max)throw Error('备份的 '+field+' 金额或数值无效。')};const color=()=>{if(!/^#[0-9a-fA-F]{6}$/.test(o.color))throw Error('备份颜色格式无效。')};if(key==='transactions'){text('name',100,true);integer('amount',-MAX_CENTS);if(!['save','purchase','expense','adjustment'].includes(o.type)||o.amount===0||o.type==='save'&&o.amount<0||['purchase','expense'].includes(o.type)&&o.amount>0)throw Error('流水类型与金额不一致。');if(o.tax!==undefined){const v=o.tax;if(!v||typeof v!=='object'||Array.isArray(v)||typeof v.enabled!=='boolean'||!Number.isSafeInteger(v.baseAmount)||v.baseAmount<=0||v.baseAmount>MAX_CENTS||!Number.isInteger(v.rate)||v.rate<0||v.rate>10000)throw Error('流水税率信息无效。');const expected=v.enabled?taxed(v.baseAmount,v.rate):v.baseAmount;if(expected>MAX_CENTS||expected!==Math.abs(o.amount))throw Error('流水含税金额与原金额不一致。');}if(typeof o.date!=='string'||!Number.isFinite(Date.parse(o.date)))throw Error('流水时间无效。');if(Date.parse(o.date)>Date.now()+60000)throw Error('备份含未来时间的流水，请检查设备时钟。');text('note');text('categoryId',200);text('quickId',200);text('goalId',200)}else if(key==='quick'){text('name',80,true);integer('amount',1);integer('tax',0,10000);integer('order',-1000000,1000000);text('categoryId',200);if(typeof o.beforeTax!=='boolean'||!ICONS[o.glyph])throw Error('快捷项目格式无效。');if(amountOf(o)>MAX_CENTS)throw Error('快捷项目金额过大。');color()}else if(key==='goals'){text('name',100,true);integer('price',1);integer('tax',0,10000);integer('shipping');text('category',50);text('note');text('image',1500000);if(o.image&&!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(o.image))throw Error('图片格式无效。');if(goalCost(o)>MAX_CENTS)throw Error('心愿总金额过大。')}else if(key==='categories'){text('name',40,true);color()}else if(key==='preferences'){if(o.id!=='main')throw Error('偏好设置 ID 无效。');integer('defaultTax',0,10000);integer('reachThreshold',1,99);if(o.primaryGoal!==null&&typeof o.primaryGoal!=='string')throw Error('主要心愿字段无效。')}}}if(size>100000)throw Error('记录过多，暂不支持此文件。');d.meta=d.meta&&typeof d.meta==='object'?d.meta:{};return {version:SCHEMA,entities:Object.fromEntries(COLLECTIONS.map(k=>[k,d.entities[k]])),meta:{lastExport:validDateOrNull(d.meta.lastExport),lastSync:validDateOrNull(d.meta.lastSync)}}}
+function validateBackup(input){const d=clone(input?.data||input);if(!d||d.version!==SCHEMA||!d.entities||typeof d.entities!=='object')throw Error('不支持的备份格式或版本。');let size=0;for(const key of COLLECTIONS){if(!Array.isArray(d.entities[key]))throw Error('备份缺少 '+key+' 数据。');size+=d.entities[key].length;const ids=new Set();for(const o of d.entities[key]){if(!o||typeof o!=='object'||Array.isArray(o)||typeof o.id!=='string'||!o.id||o.id.length>200||ids.has(o.id))throw Error('备份含无效或重复的 ID。');ids.add(o.id);if(typeof o.updatedAt!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(o.updatedAt)||!Number.isFinite(Date.parse(o.updatedAt))||typeof o.rev!=='string'||!o.rev||o.rev.length>200||typeof o.deleted!=='boolean')throw Error('备份中的版本标记不完整。');if(o.deleted)continue;const text=(field,max=2000,required=false)=>{if(o[field]===undefined&&!required)return;if(typeof o[field]!=='string'||o[field].length>max||(required&&!o[field].trim()))throw Error('备份的 '+field+' 字段无效。')};const integer=(field,min=0,max=MAX_CENTS)=>{if(!Number.isSafeInteger(o[field])||o[field]<min||o[field]>max)throw Error('备份的 '+field+' 金额或数值无效。')};const color=()=>{if(!/^#[0-9a-fA-F]{6}$/.test(o.color))throw Error('备份颜色格式无效。')};if(key==='transactions'){text('name',100,true);integer('amount',-MAX_CENTS);if(!['save','purchase','expense','adjustment'].includes(o.type)||o.amount===0||o.type==='save'&&o.amount<0||['purchase','expense'].includes(o.type)&&o.amount>0)throw Error('流水类型与金额不一致。');if(o.tax!==undefined){const v=o.tax;if(!v||typeof v!=='object'||Array.isArray(v)||typeof v.enabled!=='boolean'||!Number.isSafeInteger(v.baseAmount)||v.baseAmount<=0||v.baseAmount>MAX_CENTS||!Number.isInteger(v.rate)||v.rate<0||v.rate>10000)throw Error('流水税率信息无效。');const expected=v.enabled?taxed(v.baseAmount,v.rate):v.baseAmount;if(expected>MAX_CENTS||expected!==Math.abs(o.amount))throw Error('流水含税金额与原金额不一致。');}if(typeof o.date!=='string'||!Number.isFinite(Date.parse(o.date)))throw Error('流水时间无效。');if(Date.parse(o.date)>Date.now()+60000)throw Error('备份含未来时间的流水，请检查设备时钟。');text('note');text('categoryId',200);text('quickId',200);text('goalId',200)}else if(key==='quick'){text('name',80,true);integer('amount',1);integer('tax',0,10000);integer('order',-1000000,1000000);text('categoryId',200);if(typeof o.beforeTax!=='boolean'||!isLegacyGlyph(o.glyph)||(o.iconId!==undefined&&!isTablerGlyph(o.iconId)))throw Error('快捷项目格式无效。');if(amountOf(o)>MAX_CENTS)throw Error('快捷项目金额过大。');color()}else if(key==='goals'){text('name',100,true);integer('price',1);integer('tax',0,10000);integer('shipping');text('category',50);text('note');text('image',1500000);if(o.image&&!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(o.image))throw Error('图片格式无效。');if(goalCost(o)>MAX_CENTS)throw Error('心愿总金额过大。')}else if(key==='categories'){text('name',40,true);color()}else if(key==='preferences'){if(o.id!=='main')throw Error('偏好设置 ID 无效。');integer('defaultTax',0,10000);integer('reachThreshold',1,99);if(o.primaryGoal!==null&&typeof o.primaryGoal!=='string')throw Error('主要心愿字段无效。')}}}if(size>100000)throw Error('记录过多，暂不支持此文件。');d.meta=d.meta&&typeof d.meta==='object'?d.meta:{};return {version:SCHEMA,entities:Object.fromEntries(COLLECTIONS.map(k=>[k,d.entities[k]])),meta:{lastExport:validDateOrNull(d.meta.lastExport),lastSync:validDateOrNull(d.meta.lastSync)}}}
 function validDateOrNull(v){return typeof v==='string'&&Number.isFinite(Date.parse(v))?v:null}
 function newer(a,b){return a.updatedAt>b.updatedAt||(a.updatedAt===b.updatedAt&&a.rev>b.rev)}
 function mergeEntities(local,remote){let count=0;for(const key of COLLECTIONS){const map=new Map(local.entities[key].map(o=>[o.id,o]));for(const o of remote.entities[key]){const old=map.get(o.id);if(!old||newer(o,old)){map.set(o.id,clone(o));count++}}local.entities[key]=[...map.values()]}return count}
 function exportBackup(){const now=new Date().toISOString(),backup={app:'SAVINGS.',version:SCHEMA,exportedAt:now,data:{...clone(data),meta:{...data.meta,lastExport:now}}};const blob=new Blob([JSON.stringify(backup,null,2)],{type:'application/json'});const link=document.createElement('a'),url=URL.createObjectURL(blob);link.href=url;link.download='savings-backup-'+dayKey(new Date())+'.json';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);data.meta.lastExport=now;persist();if(route==='settings')render();toast('备份下载已开始，请确认文件已保存。',false)}
 $('#import-file').addEventListener('change',async e=>{const file=e.target.files[0];if(!file)return;try{if(file.size>25*1024*1024)throw Error('备份超过 25 MB，暂不支持。');pendingImport=validateBackup(JSON.parse(await file.text()));const d=pendingImport,tx=d.entities.transactions.filter(t=>!t.deleted),saves=tx.filter(t=>t.type==='save');openModal('让积累，回到这里。','IMPORT BACKUP / 备份内容预览',`<p class="small muted">文件：${esc(file.name)}</p><div class="summary-grid" style="grid-template-columns:1fr 1fr;margin-top:18px"><div class="summary-cell"><span class="label">RECORDS / 流水</span><strong>${tx.length}</strong></div><div class="summary-cell"><span class="label">TOTAL SAVED / 累计储蓄</span><strong class="num" style="font-size:24px">${money(saves.reduce((s,t)=>s+t.amount,0))}</strong></div></div><p class="small muted">${d.entities.quick.filter(x=>!x.deleted).length} 个快捷项目 · ${d.entities.goals.filter(x=>!x.deleted).length} 个心愿 · ${d.entities.categories.filter(x=>!x.deleted).length} 个分类</p><p class="small" style="margin-top:17px">合并按唯一 ID 去重，同一项保留更新时间较新的版本。替换会完整覆盖本机数据。</p><div class="modal-actions"><button class="btn light" data-action="import-replace">替换现有数据</button><button class="btn blue" data-action="import-merge">合并并恢复</button></div>`)}catch(error){pendingImport=null;toast('无法导入：'+error.message,false)}});
-function importBackup(mode){if(!pendingImport)return;if(mode==='replace'&&cloud.session){toast('请先退出云端账户，再替换本机数据；也可选择合并。',false);return}if(mode==='merge')mergeEntities(data,pendingImport);else data=clone(pendingImport);storageReadBlocked=false;undoStack=[];pendingImport=null;persist();closeModal();render();queueSync();toast('备份已恢复，所有统计已更新。',false)}
+function importBackup(mode){if(!pendingImport)return;if(mode==='replace'&&cloud.session){toast('请先退出云端账户，再替换本机数据；也可选择合并。',false);return}if(mode==='merge')mergeEntities(data,pendingImport);else data=addMissingCategories(clone(pendingImport));storageReadBlocked=false;undoStack=[];pendingImport=null;persist();closeModal();render();queueSync();toast('备份已恢复，所有统计已更新。',false)}
 /* 07 — Optional Supabase REST adapter. No CDN SDK.
    Entire versioned dataset is the durable offline outbox. Pull, LWW merge,
    conditional server-side upsert, and pull again; no last-write bulk overwrite.
